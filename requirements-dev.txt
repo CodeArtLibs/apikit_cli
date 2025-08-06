@@ -1,0 +1,11 @@
+ruff==0.8.4
+lxml
+pre-commit
+pyright
+black
+pylint
+pydeps
+pytest
+pytest-asyncio
+pytest-xdist
+pytest-env
