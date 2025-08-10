@@ -11,3 +11,4 @@ pytest-xdist
 pytest-env
 pyinstaller
 nuitka
+rich

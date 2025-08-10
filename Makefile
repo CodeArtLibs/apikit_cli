@@ -1,4 +1,7 @@
-CLI_VERSION := 0.0
+CLI_VERSION := 0.1
+
+# -------------------------------------------------------------------------------------------------
+# CLI Development
 
 clear:
 	clear
@@ -36,44 +39,83 @@ lint: clear clean format
 	env/bin/mypy . --strict --exclude 'env/|tests'
 	# --ignore-missing-imports
 
+# -------------------------------------------------------------------------------------------------
+# APIKit CLI Build
+
 test: clear
 	time env/bin/pytest . -n auto
 	#time env/bin/pytest . --failed-first --last-failed -n auto
+	# Env
 	env/bin/python apikit_cli/apikit.py --help
 	env/bin/python apikit_cli/apikit.py version
-	env/bin/python apikit_cli/apikit.py check_env
+	env/bin/python apikit_cli/apikit.py check
 	env/bin/python apikit_cli/apikit.py upgrade
+	# CI
 	env/bin/python apikit_cli/apikit.py format
 	env/bin/python apikit_cli/apikit.py lint
 	env/bin/python apikit_cli/apikit.py compile
-	env/bin/python apikit_cli/apikit.py build
-	env/bin/python apikit_cli/apikit.py run
 	env/bin/python apikit_cli/apikit.py tests
+	env/bin/python apikit_cli/apikit.py build
+	env/bin/python apikit_cli/apikit.py rebuild
+	env/bin/python apikit_cli/apikit.py ci
+	# Dev
+	env/bin/python apikit_cli/apikit.py start
+	env/bin/python apikit_cli/apikit.py stop
+	env/bin/python apikit_cli/apikit.py ping
+	env/bin/python apikit_cli/apikit.py db_migrate
+	env/bin/python apikit_cli/apikit.py db_clean
+	# CD
+	env/bin/python apikit_cli/apikit.py update_dev
+	env/bin/python apikit_cli/apikit.py create_alpha
+	# Debug
 	env/bin/python apikit_cli/apikit.py admin
+	env/bin/python apikit_cli/apikit.py python
+	env/bin/python apikit_cli/apikit.py report_bug
 
-build: clear format lint test
-	env/bin/pyinstaller --hidden-import=rich --onefile apikit_cli/apikit.py --distpath ./dist
-	env/bin/python -m nuitka --python-flag=no_asserts --python-flag=no_docstrings --python-flag=unbuffered --include-package=rich --standalone --onefile --show-progress --output-dir=./dist apikit_cli/apikit.py
+build: clear format lint
+	# Slow startup
+	#env/bin/pyinstaller --hidden-import=rich --onefile apikit_cli/apikit.py --distpath ./dist
+	#env/bin/python -m nuitka --python-flag=no_asserts --python-flag=no_docstrings --python-flag=unbuffered --include-package=rich --standalone --onefile --show-progress --output-dir=./dist apikit_cli/apikit.py
+	# Faster command startup. Depends on Python installed in the machine
+	env/bin/python -m nuitka --python-flag=no_asserts --python-flag=no_docstrings --python-flag=unbuffered --show-progress --output-dir=./dist apikit_cli/apikit.py
 
 test_bin: clear
+	# Env
 	apikit --help
 	apikit version
-	apikit check_env
+	apikit check
 	apikit upgrade
+	# CI
 	apikit format
 	apikit lint
 	apikit compile
-	apikit build
-	apikit run
 	apikit tests
+	apikit build
+	apikit rebuild
+	apikit ci
+	# Dev
+	apikit start
+	apikit stop
+	apikit ping
+	apikit db_migrate
+	apikit db_clean
+	# CD
+	apikit update_dev
+	apikit create_alpha
+	# Debug
 	apikit admin
+	apikit python
+	apikit report_bug
 
 publish: build
 	# Nuitka
 	cp ./dist/apikit.bin apikit
 	# PyInstaller
-	cp ./dist/apikit apikit
+	#cp ./dist/apikit apikit
 	rm version.txt
 	echo $(CLI_VERSION) > version.txt
 
-all: build test_bin publish
+copy_to_template:
+	cp apikit ../apikit_template
+
+all: test build test_bin publish copy_to_template
