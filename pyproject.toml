@@ -1,0 +1,69 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[tool.maturin]
+# "extension-module" tells pyo3 we want to build an extension module (skips linking against libpython.so)
+features = ["pyo3/extension-module"]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 130
+
+[tool.ruff.lint]
+exclude = ["shell_startup.py", "apiservice_db_latest.py", "apiservice_db_test.py", "__init__.py", "myapp*.py", "env", "*/tests/*", "*/benchmarks/*", "*/examples/*", "*/snippets/*", "*/reference/*"]
+# https://docs.astral.sh/ruff/rules/#rules
+select = [
+    # Code format
+    "E", # pycodestyle
+    "F", # Pyflakes
+    "PLC", # pylint
+
+    # Sorting imports
+    "I", # isort
+
+    # Finding bugs
+    "B", # flake8-bugbear
+    # "ASYNC",  # flake8-async
+    # "PLE", # pylint
+    # "PLW", # pylint
+
+    # Old Python Code
+    # "UP", # pyupgrade
+    # "A",  # flake8-builtins
+    # "T20", # flake8-print
+
+    # Code Complexity
+    # "SIM", # flake8-simplify
+    # "C90",  # mccabe
+    # "PLR", # pylint
+
+    # Type Checking (Pending - Disabled right now)
+    # "ANN",  # flake8-annotations
+    # "TCH", # flake8-type-checking
+
+    # Security
+    # "S",  # flake8-bandit
+
+    # Others
+    "RUF",  # ruff
+    # To disable: noqa: linkt_code
+]
+
+
+# E712: (For document.Q expressions) comparison to True should be 'if cond is True:' or 'if cond:'
+# E711: (For document.Q expressions) Comparison to `None` should be `cond is not None`
+# UP034: (For document.Q expressions) Don't remove unnecessary parentheses in conditionals
+# E402: (dev_code.py) module-import-not-at-top-of-file
+# I001: (dev_code.py) unsorted-imports
+# RUF013 PEP 484 prohibits implicit `Optional`
+# RUF100 Unused `noqa` directive (unused: `F401`)
+ignore = ["UP038", "UP037", "B019", "UP028", "UP035", "RUF013", "RUF100"]
+
+[tool.ruff.format]
+# https://docs.astral.sh/ruff/rules/
+quote-style = "single"
+indent-style = "space"
+# indent-size = 4
+skip-magic-trailing-comma = false
+line-ending = "auto"

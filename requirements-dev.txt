@@ -9,3 +9,5 @@ pytest
 pytest-asyncio
 pytest-xdist
 pytest-env
+pyinstaller
+nuitka

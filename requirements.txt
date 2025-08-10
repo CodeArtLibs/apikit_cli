@@ -9,7 +9,7 @@ mypy==1.17.0
 # -----------------------------------------------
 
 # https://github.com/Textualize/rich/releases
-rich
+rich==14.1.0
 
 # https://github.com/ijl/orjson/blob/master/CHANGELOG.md
 orjson==3.10.18
