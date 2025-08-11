@@ -32,3 +32,4 @@ minikube-linux*
 apikit.spec
 apikit_old
 apikit_new
+.db/

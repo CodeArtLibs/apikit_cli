@@ -29,21 +29,20 @@ shell: clear
 	env/bin/python
 
 format: clear
-	env/bin/ruff format .
+	env/bin/ruff format . --exclude sample_app
 
 lint: clear clean format
 	@# env/bin/pre-commit run --all-files
-	env/bin/ruff format .
-	env/bin/ruff check . --fix
+	env/bin/ruff check . --fix --exclude sample_app
 	-env/bin/python -OO -m compileall --workers 10 -q .
-	env/bin/mypy . --strict --exclude 'env/|tests'
+	env/bin/mypy . --strict --exclude 'env/|tests|sample_app/'
 	# --ignore-missing-imports
 
 # -------------------------------------------------------------------------------------------------
 # APIKit CLI Build
 
 test: clear
-	time env/bin/pytest . -n auto
+	time env/bin/pytest . -n auto --ignore sample_app
 	#time env/bin/pytest . --failed-first --last-failed -n auto
 	# Env
 	env/bin/python apikit_cli/apikit.py --help
@@ -107,7 +106,7 @@ test_bin: clear
 	apikit python
 	apikit report_bug
 
-publish: build
+update: build
 	# Nuitka
 	cp ./dist/apikit.bin apikit
 	# PyInstaller
@@ -118,4 +117,10 @@ publish: build
 copy_to_template:
 	cp apikit ../apikit_template
 
-all: test build test_bin publish copy_to_template
+all: test build test_bin update copy_to_template
+
+publish: all
+	git add version.txt apikit
+	git push origin main
+	git tag $(CLI_VERSION)
+	git push origin $(CLI_VERSION)

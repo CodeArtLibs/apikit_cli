@@ -7,7 +7,11 @@ from __future__ import annotations
 import argparse
 import configparser
 import os
+import random
+import secrets
+import shlex
 import shutil
+import socket
 import ssl
 import stat
 import subprocess
@@ -15,10 +19,12 @@ import sys
 import time
 import typing
 import urllib.request
+from contextlib import contextmanager
 
 from packaging import version
 
 API_KIT_VERSION = __version__ = '0.1'
+DEBUG: bool = False
 
 
 def color(color: str, string: str) -> str:
@@ -49,6 +55,10 @@ def cyan(string: str) -> str:
     return color('36', string)
 
 
+def random_suffix(length: int = 8) -> str:
+    return secrets.token_hex(length // 2)
+
+
 class APIKitCLIException(Exception):
     def __init__(self, msg: str, **kwargs: typing.Any) -> None:
         pass
@@ -63,12 +73,14 @@ class ShellCmdOutput(typing.TypedDict):
 
 
 class CommandCLI:
+    containers: typing.ClassVar[list[str]] = []
+
     def __init__(self, **kwargs: str) -> None:
         pass
 
     def execute_shell_command(
         self,
-        command_line: str,
+        command_line: str | list[str],
         *,
         cwd: str | None = None,
         raise_on_error: bool = False,
@@ -84,7 +96,7 @@ class CommandCLI:
         try:
             ref: float = time.time()
             result = subprocess.run(
-                command_line.split(),
+                shlex.split(command_line) if isinstance(command_line, str) else command_line,
                 cwd=cwd,
                 shell=False,
                 check=False,
@@ -94,7 +106,8 @@ class CommandCLI:
                 env=env,
             )
             elapsed_secs: float = round(time.time() - ref, 2)
-            # print(f'{command_line} => {result.returncode}')  # , layer='shell')
+            if DEBUG:
+                print(f'{command_line} => {result.returncode}')  # , layer='shell')
             # if result.stdout:
             #     print(f'Output: {result.stdout}')  # , layer='shell')
             # if result.stderr:
@@ -109,7 +122,7 @@ class CommandCLI:
                         shell_error=result.stderr,
                     )
             return {
-                'cmd': command_line,
+                'cmd': command_line if isinstance(command_line, str) else ' '.join(command_line),
                 'code': str(result.returncode),
                 'output': result.stdout or result.stderr,
                 'error': result.returncode != 0,
@@ -140,15 +153,78 @@ class CommandCLI:
         #                 # ignore for now, for mypyc
         #                 print(str(e), layer='shell')
 
-    def docker_run(self, container_cmd: str, interactive: bool = False, capture_output: bool = False) -> None:
+    def docker_run(
+        self,
+        container_cmd: str,
+        interactive: bool = False,
+        capture_output: bool = False,
+        detached: bool = False,
+        web_port: bool = False,
+        host_network: bool = False,
+        **env: str,
+    ) -> None:
         # -p HOST_PORT:CONTAINER_PORT
+        docker_image: str = CONFIG['docker_image']
         host_cmd: str
+        env_vars: str = ' '.join([arg for k, v in env.items() for arg in ('-e', f'{k}={v}')])
+        port: str = CONFIG['port']
+        port_attr: str = f'-p {port}:50000' if web_port else ''
+        network: str = '--network host' if host_network else ''
+        detached_attr: str = '-d' if detached else ''
         if interactive:
-            host_cmd = 'docker run -v ./apps:/app/apps --network host -it apikit-dev:latest'
+            #
+            host_cmd = f'docker run {detached_attr} -v ./apps:/app/apps {env_vars} {network} {port_attr} -it {docker_image}'
         else:
-            host_cmd = 'docker run -v ./apps:/app/apps --network host apikit-dev:latest'
-        print(yellow(f'{host_cmd} {container_cmd}'))
+            host_cmd = f'docker run {detached_attr} -v ./apps:/app/apps {env_vars} {network} {port_attr} {docker_image}'
+        if DEBUG:
+            print(yellow(f'{host_cmd} {container_cmd}'))
         self.execute_shell_command(f'{host_cmd} {container_cmd}', capture_output=capture_output)
+
+    def api_request(self, path: str, method: str = 'POST') -> None:
+        self.execute_shell_command(f'http --verify=no --follow POST {CONFIG["api_url"]}{path}')
+
+    def run_mongodb(self, container_name: str, storage_folder: str = '') -> str:
+        """
+        docker start container_name
+        docker stop container_name
+        """
+
+        port: int = find_free_port()
+        storage: str = f'-v {storage_folder}:/data/db' if storage_folder else ''
+        cmd: str = f'docker run -d {storage} -p {port}:27017 --name {container_name} mongo:8.0.4-noble mongod --bind_ip_all'
+        self.execute_shell_command(cmd, capture_output=True)
+        self.containers.append(container_name)
+        return f'mongodb://localhost:{port}?authSource=admin'
+
+    def run_redis(self, container_name: str) -> str:
+        """
+        docker start container_name
+        docker stop container_name
+        """
+
+        port: int = find_free_port()
+        cmd: str = f'docker run -d -p {port}:6379 --name {container_name} redis:8.0-M02-alpine3.20'
+        self.execute_shell_command(cmd, capture_output=True)
+        self.containers.append(container_name)
+        return f'redis://localhost:{port}/0'
+
+    def stop_docker_container(self, container_name: str) -> None:
+        # stop => kill
+        self.execute_shell_command(f'docker stop -t 3 {container_name}')
+
+    @contextmanager
+    def with_mongodb(self, container_name: str, storage_folder: str = '') -> typing.Generator[str]:
+        try:
+            yield self.run_mongodb(container_name, storage_folder)
+        finally:
+            self.stop_docker_container(container_name)
+
+    @contextmanager
+    def with_redis(self, container_name: str) -> typing.Generator[str]:
+        try:
+            yield self.run_redis(container_name)
+        finally:
+            self.stop_docker_container(container_name)
 
     def execute(self) -> None:
         pass
@@ -182,7 +258,6 @@ class CheckCommandCLI(CommandCLI):
 
 class UpgradeCommandCLI(CommandCLI):
     def execute(self) -> None:
-        # pip
         try:
             latest_version: str = self.latest_version()
             if version.parse(latest_version) > version.parse(API_KIT_VERSION):
@@ -239,45 +314,35 @@ class CompileCommandCLI(CommandCLI):
 
 class TestsCommandCLI(CommandCLI):
     def execute(self) -> None:
-        pytest: str = """
-[pytest]
-asyncio_mode = auto
-asyncio_default_fixture_loop_scope = session
-asyncio_default_test_loop_scope = session
-testpaths = apps
-env =
-    API_VERSION=test
-    MONGODB_URI=mongodb://localhost:27017/{app}_test?authSource=admin
-    MONGODB_NAME={app}_test
-    REDIS_URL=redis://localhost:6379/0
-    DEV_ENV=true
-    TEST_ENV=true
-"""
-        pytest_cmd: str = (
-            '/app/env/bin/pytest'
-            ' --asyncio-mode=auto'
-            # ' --asyncio-default-fixture-loop-scope=session'
-            # ' --asyncio-default-test-loop-scope=session'
-            # ' --env=API_VERSION=test'
-            # ' --env=MONGODB_URI=mongodb://localhost:27017/apikit_unittest?authSource=admin'
-            # ' --env=MONGODB_NAME=apikit_unittest'
-            # ' --env=REDIS_URL=redis://localhost:6379/0'
-            # ' --env=DEV_ENV=true'
-            # ' --env=TEST_ENV=true'
-            ' /app/apps -n auto -q --disable-warnings --tb=no'
-        )
-        self.docker_run(pytest_cmd)
+        app: str = CONFIG['app']
+        mongodb_container_name: str = f'{CONFIG["app"]}_tests_mongodb_{random_suffix()}'
+        redis_container_name: str = f'{CONFIG["app"]}_tests_redis_{random_suffix()}'
+        mongo_url: str
+        redis_url: str
+        with self.with_mongodb(mongodb_container_name) as mongo_url, self.with_redis(redis_container_name) as redis_url:
+            pytest_cmd: str = '/app/env/bin/pytest --asyncio-mode=auto /app/apps -n auto -q --disable-warnings --tb=no'
+            self.docker_run(
+                pytest_cmd,
+                host_network=True,
+                MONGODB_URI=mongo_url,
+                MONGODB_NAME=f'{app}_unittest',
+                REDIS_URL=redis_url,
+            )
 
 
 class BuildCommandCLI(CommandCLI):
     def execute(self) -> None:
-        self.execute_shell_command(f'docker compose build --no-cache apikit-{app}')
+        docker_image: str = CONFIG['docker_image']
+        self.execute_shell_command(f'docker build -f Dockerfile . -t {docker_image}')
+        # self.execute_shell_command(f'docker compose build --no-cache api_web')
 
 
 class RebuildCommandCLI(CommandCLI):
     def execute(self) -> None:
-        self.execute_shell_command(f'docker compose rm {app}')
-        self.execute_shell_command(f'docker compose build --no-cache {app}')
+        docker_image: str = CONFIG['docker_image']
+        self.execute_shell_command(f'docker build --no-cache -f Dockerfile . -t {docker_image}')
+        # self.execute_shell_command(f'docker compose rm api_web')
+        # self.execute_shell_command(f'docker compose build --no-cache api_web')
 
 
 class CICommandCLI(CommandCLIComposite):
@@ -286,58 +351,101 @@ class CICommandCLI(CommandCLIComposite):
 
 class StartCommandCLI(CommandCLI):
     def execute(self) -> None:
-        self.execute_shell_command('docker compose up -d')
-        print(yellow('open http://localhost:50000'))
-        self.execute_shell_command('open http://localhost:50000')
-        self.execute_shell_command('docker compose logs -f api_web api_tasks')
+        app: str = CONFIG['app']
+        print(yellow('API: ') + CONFIG['api_url'])
+        print(yellow('ADMIN: ') + CONFIG['admin_url'])
+        mongodb_container_name: str = f'{CONFIG["app"]}_dev_mongodb_{random_suffix()}'
+        redis_container_name: str = f'{CONFIG["app"]}_dev_redis_{random_suffix()}'
+        mongo_url: str
+        redis_url: str
+        with self.with_mongodb(mongodb_container_name, '.db') as mongo_url, self.with_redis(redis_container_name) as redis_url:
+            self.docker_run(
+                (
+                    '/app/env/bin/uvicorn'
+                    ' api_web.version_server:asgi_app'
+                    ' --host 0.0.0.0'
+                    ' --port 50000'
+                    ' --workers 1'
+                    ' --loop uvloop'
+                    ' --interface asgi3'
+                    ' --lifespan on'
+                    ' --no-server-header'
+                    ' --no-date-header'
+                    ' --reload'
+                    ' --reload-dir ./apps'
+                ),
+                web_port=True,
+                API_VERSION='dev',
+                MONGODB_URI=mongo_url,
+                MONGODB_NAME=f'{app}_dev',
+                REDIS_URL=redis_url,
+            )
+
+        # docker_image: str = CONFIG['docker_image']
+        # self.execute_shell_command(f'docker build -f Dockerfile . -t {docker_image}')
+        self.api_request('/status/ping')
+        # self.execute_shell_command('docker compose up -d')
+        # self.execute_shell_command('docker compose logs -f api_web')
 
 
 class StopCommandCLI(CommandCLI):
     def execute(self) -> None:
-        self.execute_shell_command('docker compose down --remove-orphans')
+        for container in self.containers:
+            self.stop_docker_container(container)
+        # self.execute_shell_command('docker compose down --remove-orphans')
 
 
 class DBMigrateCommandCLI(CommandCLI):
     def execute(self) -> None:
-        pass
-        # self.execute_shell_command('docker compose ')
+        self.api_request('/data/_setup')
 
 
 class DBCleanCommandCLI(CommandCLI):
     def execute(self) -> None:
-        pass
-        # self.execute_shell_command('docker compose ')
+        app: str = CONFIG['app']
+        mongodb_container_name: str = f'{CONFIG["app"]}_dev_mongodb_{random_suffix()}'
+        with self.with_mongodb(mongodb_container_name, '.db') as mongo_url:
+            cmd = (
+                f'env/bin/python -c '
+                "'"
+                'from pymongo import MongoClient; '
+                f"""MongoClient("{mongo_url}").drop_database("{app}_dev")"""
+                "'"
+            )
+            self.docker_run(cmd)
 
 
 class UpdateDevCommandCLI(CommandCLI):
     def execute(self) -> None:
+        # Hints: git remote show origin ; git checkout dev ; git push origin dev
         print(yellow('git push to `dev` branch'))
 
 
 class CreateAlphaCommandCLI(CommandCLI):
     def execute(self) -> None:
+        # Hints: git remote show origin ; git checkout alpha ; git push origin alpha
         print(yellow('git push to `alpha` branch'))
 
 
 class AdminCommandCLI(CommandCLI):
     def execute(self) -> None:
-        ADMIN_URL: str = 'http://localhost:9001/auth/signin?'
-        API_URL: str = 'http://localhost:50000'
-        self.execute_shell_command(f'open {ADMIN_URL}api={API_URL}')
+        self.execute_shell_command(f'open {CONFIG["admin_url"]}')
 
 
 class PingCommandCLI(CommandCLI):
     def execute(self) -> None:
-        self.execute_shell_command(f'http POST http://localhost:33333/status/ping')
+        self.api_request('/status/ping')
 
 
 class PythonCommandCLI(CommandCLI):
     def execute(self) -> None:
+        # FIXME: use App's image
         self.docker_run('env/bin/python', interactive=True)
 
 
 class ReportBugCommandCLI(CommandCLI):
     def execute(self) -> None:
+        # TODO: request
         print(yellow('Noted, it will be investigated.'))
 
 
@@ -370,23 +478,53 @@ COMMANDS: dict[str, type[CommandCLI]] = {
 }
 
 
-def read_config_file() -> None:
+def find_free_port(start: int = 33200, end: int = 33299) -> int:
+    ports = list(range(start, end + 1))
+    random.shuffle(ports)
+    for port in ports:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            if s.connect_ex(('localhost', port)) != 0:
+                return port
+    # fallback: ask OS for a free port
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('', 0))
+        return int(s.getsockname()[1])
+
+
+def get_app_config() -> dict[str, typing.Any]:
     """
     apikit.ini
     [apikit]
-    app = localhost
+    app = myapp
     port = 33333
+    api_url = http://localhost:33333
+    admin_url = http://localhost:9001/auth/signin?api=http://localhost:33333')
     autoupdate = false
     report = false
     """
-    config = configparser.ConfigParser()
+    config: dict[str, typing.Any]
+    parser = configparser.ConfigParser()
     try:
-        config.read('config.ini')
-        config['apikit']['port']
-        config['apikit']['app']
-    except Exception:
-        pass
+        # CWD/apikit.ini
+        parser.read('apikit.ini')
+        config = dict(parser['apikit'])
+    except Exception as e:
+        print(red(str(e)))
+        config = {}
+    config.setdefault('app', 'myapp')
+    app: str = config['app']
+    config.setdefault('port', '33333')
+    config.setdefault('docker_image', f'{app}:dev')
+    config.setdefault('autoupdate', '1')
+    config.setdefault('api_url', f'http://localhost:{config["port"]}')
+    config.setdefault('admin_url', f'http://localhost:9001/auth/signin?api={config["api_url"]}')
+    config.setdefault('autoupdate', '1')
+    if DEBUG:
+        print(white(str(config)))
+    return config
 
+
+CONFIG: dict[str, typing.Any] = get_app_config()
 
 if __name__ == '__main__':
     """

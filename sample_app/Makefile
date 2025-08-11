@@ -60,7 +60,7 @@ ping:
 	@../env/bin/python ../apikit_cli/apikit.py ping
 	@echo '--------------------------------------'
 
-db_migration:
+db_migrate:
 	@../env/bin/python ../apikit_cli/apikit.py db_migrate
 	@echo '--------------------------------------'
 
