@@ -115,8 +115,8 @@ update: build
 	cp ./dist/apikit.bin apikit
 	# PyInstaller
 	#cp ./dist/apikit apikit
-	rm version.txt
-	echo $(CLI_VERSION) > version.txt
+	rm releases/latest.txt
+	echo $(CLI_VERSION) > releases/latest.txt
 
 copy_to_template:
 	cp apikit ../apikit_template
@@ -124,7 +124,8 @@ copy_to_template:
 all: test build test_bin update copy_to_template
 
 publish:
-	git add version.txt apikit apikit_cli/apikit.py Makefile
+	shasum -a 256 apikit > releases/apikit_$(CLI_VERSION).hash
+	git add releases/latest.txt releases/apikit_$(CLI_VERSION).hash apikit apikit_cli/apikit.py Makefile
 	git push origin main
 	git tag $(CLI_VERSION)
 	git push origin $(CLI_VERSION)

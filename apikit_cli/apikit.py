@@ -372,7 +372,7 @@ class UpgradeCommandCLI(CommandCLI):
             print(yellow('Update check failed.'))
 
     def latest_version(self) -> str:
-        url: str = 'https://raw.githubusercontent.com/CodeArtLibs/apikit_cli/refs/heads/main/version.txt'
+        url: str = 'https://raw.githubusercontent.com/CodeArtLibs/apikit_cli/refs/heads/main/releases/latest.txt'
         context = ssl._create_unverified_context()
         with urllib.request.urlopen(url, context=context) as response:
             return str(response.read().decode('utf-8').strip())
