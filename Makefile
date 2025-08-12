@@ -123,7 +123,7 @@ copy_to_template:
 
 all: test build test_bin update copy_to_template
 
-# Update CLI_VERSION
+# Update Makefile/CLI_VERSION and apikit.py/API_KIT_VERSION
 publish: copy_to_template
 	echo $(CLI_VERSION) > releases/latest.txt
 	shasum -a 256 apikit > releases/apikit_$(CLI_VERSION).hash
