@@ -210,7 +210,7 @@ class CommandCLI:
 
     def stop_docker_container(self, container_name: str) -> None:
         # stop => kill
-        self.execute_shell_command(f'docker stop -t 3 {container_name}')
+        self.execute_shell_command(f'docker stop -t 3 {container_name}', capture_output=True)
 
     @contextmanager
     def with_mongodb(self, container_name: str, storage_folder: str = '') -> typing.Generator[str]:
@@ -569,4 +569,7 @@ if __name__ == '__main__':
 
     CommandCLIClass: type[CommandCLI] = COMMANDS[args.command]
     cmd: CommandCLI = CommandCLIClass(**vars(args))
-    cmd.execute()
+    try:
+        cmd.execute()
+    except KeyboardInterrupt:
+        pass
