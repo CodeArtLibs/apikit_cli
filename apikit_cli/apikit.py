@@ -60,6 +60,76 @@ def random_suffix(length: int = 8) -> str:
     return secrets.token_hex(length // 2)
 
 
+def find_repo_root(start_path: str | None = None) -> str | None:
+    # basename $(git rev-parse --show-toplevel)
+    if start_path is None:
+        start_path = os.getcwd()
+    current = start_path
+    while current != os.path.dirname(current):  # until root
+        if os.path.isdir(os.path.join(current, '.git')):
+            return os.path.basename(current)
+        current = os.path.dirname(current)
+    return None
+
+
+def find_free_port(start: int = 33200, end: int = 33299, shuffle: bool = False) -> int:
+    ports = list(range(start, end + 1))
+    if shuffle:
+        random.shuffle(ports)
+    for port in ports:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            if s.connect_ex(('localhost', port)) != 0:
+                return port
+    # fallback: ask OS for a free port
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('', 0))
+        return int(s.getsockname()[1])
+
+
+def get_app_config() -> dict[str, typing.Any]:
+    """
+    apikit.ini
+    [apikit]
+    app = myapp
+    port = 33333
+    api_url = http://localhost:33333
+    admin_url = http://localhost:9001/auth/signin?api=http://localhost:33333')
+    autoupdate = false
+    report = false
+    """
+    config: dict[str, typing.Any]
+    parser = configparser.ConfigParser()
+    try:
+        # CWD/apikit.ini
+        parser.read('apikit.ini')
+        config = dict(parser['apikit'])
+    except Exception as e:
+        print(red(str(e)))
+        config = {}
+    config.setdefault('app', find_repo_root())
+    app: str = config['app']
+    config.setdefault('port', '33333')
+    config.setdefault('docker_image', f'{app}:dev')
+    config.setdefault('token', '')
+    config.setdefault('autoupdate', '1')
+    config.setdefault('api_url', f'http://localhost:{config["port"]}')
+    config.setdefault('admin_url', f'http://localhost:9001/auth/signin?api={config["api_url"]}')
+    config.setdefault('autoupdate', '1')
+    if DEBUG:
+        print(white(str(config)))
+    return config
+
+
+def save_config() -> None:
+    parser = configparser.ConfigParser()
+    parser['apikit'] = CONFIG
+    with open('apikit.ini', 'w') as f:
+        parser.write(f)
+
+
+CONFIG: dict[str, typing.Any] = get_app_config()
+
+
 class APIKitCLIException(Exception):
     def __init__(self, msg: str, **kwargs: typing.Any) -> None:
         pass
@@ -158,7 +228,7 @@ class CommandCLI:
         interactive: bool = False,
         capture_output: bool = False,
         detached: bool = False,
-        web_port: bool = False,
+        port_mapping: str = '',
         host_network: bool = False,
         container_name: str = '',
         **env: str,
@@ -167,23 +237,21 @@ class CommandCLI:
         docker_image: str = CONFIG['docker_image']
         host_cmd: str
         env_vars: str = ' '.join([arg for k, v in env.items() for arg in ('-e', f'{k}={v}')])
-        port: str = CONFIG['port']
-        port_attr: str = f'-p {port}:50000' if web_port else ''
         network: str = '--network host' if host_network else '--add-host=host.docker.internal:host-gateway'
         detached_attr: str = '-d' if detached else ''
         name: str = f'--name {container_name}' if container_name else ''
         if interactive:
             #
             host_cmd = (
-                f'docker run {detached_attr} {name} -v ./apps:/app/apps {env_vars} {network} {port_attr} -it {docker_image}'
+                f'docker run {detached_attr} {name} -v ./apps:/app/apps {env_vars} {network} {port_mapping} -it {docker_image}'
             )
         else:
-            host_cmd = f'docker run {detached_attr} {name} -v ./apps:/app/apps {env_vars} {network} {port_attr} {docker_image}'
+            host_cmd = f'docker run {detached_attr} {name} -v ./apps:/app/apps {env_vars} {network} {port_mapping} {docker_image}'
         if DEBUG:
             print(yellow(f'{host_cmd} {container_cmd}'))
         self.execute_shell_command(f'{host_cmd} {container_cmd}', capture_output=capture_output)
 
-    def api_request(self, path: str, method: str = 'POST') -> None:
+    def api_request(self, path: str, method: str = 'POST', **headers: str) -> None:
         self.execute_shell_command(f'http --verify=no --follow POST {CONFIG["api_url"]}{path}')
 
     def run_mongodb(self, container_name: str, storage_folder: str = '', network_host: bool = False) -> str:
@@ -192,7 +260,7 @@ class CommandCLI:
         docker stop container_name
         """
 
-        port: int = find_free_port()
+        port: int = find_free_port(shuffle=True)
         storage: str = f'-v {storage_folder}:/data/db' if storage_folder else ''
         cmd: str = f'docker run -d {storage} -p {port}:27017 --name {container_name} mongo:8.0.4-noble mongod --bind_ip_all'
         self.execute_shell_command(cmd, capture_output=True)
@@ -209,7 +277,7 @@ class CommandCLI:
         docker stop container_name
         """
 
-        port: int = find_free_port()
+        port: int = find_free_port(shuffle=True)
         cmd: str = f'docker run -d -p {port}:6379 --name {container_name} redis:8.0-M02-alpine3.20'
         self.execute_shell_command(cmd, capture_output=True)
         self.cache_running_containers(container_name)
@@ -383,8 +451,6 @@ class CICommandCLI(CommandCLIComposite):
 class StartCommandCLI(CommandCLI):
     def execute(self) -> None:
         app: str = CONFIG['app']
-        print(yellow('API: ') + CONFIG['api_url'])
-        print(yellow('ADMIN: ') + CONFIG['admin_url'])
         mongodb_container_name: str = f'{CONFIG["app"]}_dev_mongodb_{random_suffix()}'
         redis_container_name: str = f'{CONFIG["app"]}_dev_redis_{random_suffix()}'
         mongo_url: str
@@ -392,6 +458,15 @@ class StartCommandCLI(CommandCLI):
         with self.with_mongodb(mongodb_container_name, '.db') as mongo_url, self.with_redis(redis_container_name) as redis_url:
             api_container_name: str = f'{CONFIG["app"]}_api_{random_suffix()}'
             self.cache_running_containers(api_container_name)
+
+            port: int = find_free_port(start=int(CONFIG['port']), shuffle=False)
+            CONFIG['port'] = str(port)
+            CONFIG['api_url'] = f'http://localhost:{port}'
+            CONFIG['admin_url'] = f'http://localhost:9001/auth/signin?api={CONFIG["api_url"]}'
+            CONFIG['token'] = secrets.token_hex(64)
+            print(yellow('API: ') + CONFIG['api_url'])
+            print(yellow('ADMIN: ') + CONFIG['admin_url'])
+            save_config()
             self.docker_run(
                 (
                     '/app/env/bin/uvicorn'
@@ -407,7 +482,7 @@ class StartCommandCLI(CommandCLI):
                     ' --reload'
                     ' --reload-dir ./apps'
                 ),
-                web_port=True,
+                port_mapping=f'-p {port}:50000',
                 host_network=False,
                 container_name=api_container_name,
                 DEV_ENV='true',
@@ -415,6 +490,7 @@ class StartCommandCLI(CommandCLI):
                 MONGODB_URI=mongo_url,
                 MONGODB_NAME=f'{app}_dev',
                 REDIS_URL=redis_url,
+                APIKIT_SECRET_KEY=CONFIG['token'],
             )
 
         # docker_image: str = CONFIG['docker_image']
@@ -433,7 +509,7 @@ class StopCommandCLI(CommandCLI):
 
 class DBMigrateCommandCLI(CommandCLI):
     def execute(self) -> None:
-        self.api_request('/data/_setup')
+        self.api_request('/data/_setup', itoken=CONFIG['token'])
 
 
 class DBCleanCommandCLI(CommandCLI):
@@ -513,54 +589,6 @@ COMMANDS: dict[str, type[CommandCLI]] = {
     'report_bug': ReportBugCommandCLI,
 }
 
-
-def find_free_port(start: int = 33200, end: int = 33299) -> int:
-    ports = list(range(start, end + 1))
-    random.shuffle(ports)
-    for port in ports:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            if s.connect_ex(('localhost', port)) != 0:
-                return port
-    # fallback: ask OS for a free port
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(('', 0))
-        return int(s.getsockname()[1])
-
-
-def get_app_config() -> dict[str, typing.Any]:
-    """
-    apikit.ini
-    [apikit]
-    app = myapp
-    port = 33333
-    api_url = http://localhost:33333
-    admin_url = http://localhost:9001/auth/signin?api=http://localhost:33333')
-    autoupdate = false
-    report = false
-    """
-    config: dict[str, typing.Any]
-    parser = configparser.ConfigParser()
-    try:
-        # CWD/apikit.ini
-        parser.read('apikit.ini')
-        config = dict(parser['apikit'])
-    except Exception as e:
-        print(red(str(e)))
-        config = {}
-    config.setdefault('app', 'myapp')
-    app: str = config['app']
-    config.setdefault('port', '33333')
-    config.setdefault('docker_image', f'{app}:dev')
-    config.setdefault('autoupdate', '1')
-    config.setdefault('api_url', f'http://localhost:{config["port"]}')
-    config.setdefault('admin_url', f'http://localhost:9001/auth/signin?api={config["api_url"]}')
-    config.setdefault('autoupdate', '1')
-    if DEBUG:
-        print(white(str(config)))
-    return config
-
-
-CONFIG: dict[str, typing.Any] = get_app_config()
 
 if __name__ == '__main__':
     """

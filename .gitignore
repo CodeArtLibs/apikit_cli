@@ -33,3 +33,4 @@ apikit.spec
 apikit_old
 apikit_new
 .db/
+apikit.ini
