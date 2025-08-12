@@ -2,7 +2,6 @@ TODO
 =================================================
 
 - commands:
-    - start/stop
     - update dev
     - create alpha
     - report bug

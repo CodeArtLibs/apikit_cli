@@ -2,7 +2,7 @@ clear:
 	clear
 
 shell:
-	docker run -v ./apps:/app/apps -it apikit-dev:latest ash
+	docker run -v ./apps:/app/apps --network host -it apikit-dev:latest ash
 
 help:
 	@../env/bin/python ../apikit_cli/apikit.py --help

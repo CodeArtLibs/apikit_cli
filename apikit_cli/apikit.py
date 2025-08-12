@@ -16,6 +16,7 @@ import ssl
 import stat
 import subprocess
 import sys
+import tempfile
 import time
 import typing
 import urllib.request
@@ -73,8 +74,6 @@ class ShellCmdOutput(typing.TypedDict):
 
 
 class CommandCLI:
-    containers: typing.ClassVar[list[str]] = []
-
     def __init__(self, **kwargs: str) -> None:
         pass
 
@@ -161,6 +160,7 @@ class CommandCLI:
         detached: bool = False,
         web_port: bool = False,
         host_network: bool = False,
+        container_name: str = '',
         **env: str,
     ) -> None:
         # -p HOST_PORT:CONTAINER_PORT
@@ -169,13 +169,16 @@ class CommandCLI:
         env_vars: str = ' '.join([arg for k, v in env.items() for arg in ('-e', f'{k}={v}')])
         port: str = CONFIG['port']
         port_attr: str = f'-p {port}:50000' if web_port else ''
-        network: str = '--network host' if host_network else ''
+        network: str = '--network host' if host_network else '--add-host=host.docker.internal:host-gateway'
         detached_attr: str = '-d' if detached else ''
+        name: str = f'--name {container_name}' if container_name else ''
         if interactive:
             #
-            host_cmd = f'docker run {detached_attr} -v ./apps:/app/apps {env_vars} {network} {port_attr} -it {docker_image}'
+            host_cmd = (
+                f'docker run {detached_attr} {name} -v ./apps:/app/apps {env_vars} {network} {port_attr} -it {docker_image}'
+            )
         else:
-            host_cmd = f'docker run {detached_attr} -v ./apps:/app/apps {env_vars} {network} {port_attr} {docker_image}'
+            host_cmd = f'docker run {detached_attr} {name} -v ./apps:/app/apps {env_vars} {network} {port_attr} {docker_image}'
         if DEBUG:
             print(yellow(f'{host_cmd} {container_cmd}'))
         self.execute_shell_command(f'{host_cmd} {container_cmd}', capture_output=capture_output)
@@ -183,7 +186,7 @@ class CommandCLI:
     def api_request(self, path: str, method: str = 'POST') -> None:
         self.execute_shell_command(f'http --verify=no --follow POST {CONFIG["api_url"]}{path}')
 
-    def run_mongodb(self, container_name: str, storage_folder: str = '') -> str:
+    def run_mongodb(self, container_name: str, storage_folder: str = '', network_host: bool = False) -> str:
         """
         docker start container_name
         docker stop container_name
@@ -193,10 +196,14 @@ class CommandCLI:
         storage: str = f'-v {storage_folder}:/data/db' if storage_folder else ''
         cmd: str = f'docker run -d {storage} -p {port}:27017 --name {container_name} mongo:8.0.4-noble mongod --bind_ip_all'
         self.execute_shell_command(cmd, capture_output=True)
-        self.containers.append(container_name)
-        return f'mongodb://localhost:{port}?authSource=admin'
+        self.cache_running_containers(container_name)
+        # ?authSource=admin'
+        if network_host:
+            return 'mongodb://localhost:27017'
+        else:
+            return f'mongodb://host.docker.internal:{port}'
 
-    def run_redis(self, container_name: str) -> str:
+    def run_redis(self, container_name: str, network_host: bool = False) -> str:
         """
         docker start container_name
         docker stop container_name
@@ -205,8 +212,11 @@ class CommandCLI:
         port: int = find_free_port()
         cmd: str = f'docker run -d -p {port}:6379 --name {container_name} redis:8.0-M02-alpine3.20'
         self.execute_shell_command(cmd, capture_output=True)
-        self.containers.append(container_name)
-        return f'redis://localhost:{port}/0'
+        self.cache_running_containers(container_name)
+        if network_host:
+            return 'redis://localhost:6379/0'
+        else:
+            return f'redis://host.docker.internal:{port}/0'
 
     def stop_docker_container(self, container_name: str) -> None:
         # stop => kill
@@ -225,6 +235,27 @@ class CommandCLI:
             yield self.run_redis(container_name)
         finally:
             self.stop_docker_container(container_name)
+
+    def get_cache_file(self) -> str:
+        temp_dir: str = tempfile.gettempdir()
+        return os.path.join(temp_dir, f'.apikit_{CONFIG["app"]}_cache')
+
+    def cache_running_containers(self, container_name: str) -> None:
+        with open(self.get_cache_file(), 'a') as f:
+            f.write(f',{container_name}')
+
+    def get_running_containers(self) -> list[str]:
+        try:
+            with open(self.get_cache_file(), 'r') as f:
+                return f.read().split(',')
+        except Exception:
+            return []
+
+    def clean_running_containers(self) -> None:
+        try:
+            os.remove(self.get_cache_file())
+        except Exception:
+            pass
 
     def execute(self) -> None:
         pass
@@ -323,7 +354,7 @@ class TestsCommandCLI(CommandCLI):
             pytest_cmd: str = '/app/env/bin/pytest --asyncio-mode=auto /app/apps -n auto -q --disable-warnings --tb=no'
             self.docker_run(
                 pytest_cmd,
-                host_network=True,
+                host_network=False,
                 MONGODB_URI=mongo_url,
                 MONGODB_NAME=f'{app}_unittest',
                 REDIS_URL=redis_url,
@@ -359,6 +390,8 @@ class StartCommandCLI(CommandCLI):
         mongo_url: str
         redis_url: str
         with self.with_mongodb(mongodb_container_name, '.db') as mongo_url, self.with_redis(redis_container_name) as redis_url:
+            api_container_name: str = f'{CONFIG["app"]}_api_{random_suffix()}'
+            self.cache_running_containers(api_container_name)
             self.docker_run(
                 (
                     '/app/env/bin/uvicorn'
@@ -375,6 +408,9 @@ class StartCommandCLI(CommandCLI):
                     ' --reload-dir ./apps'
                 ),
                 web_port=True,
+                host_network=False,
+                container_name=api_container_name,
+                DEV_ENV='true',
                 API_VERSION='dev',
                 MONGODB_URI=mongo_url,
                 MONGODB_NAME=f'{app}_dev',
@@ -390,9 +426,9 @@ class StartCommandCLI(CommandCLI):
 
 class StopCommandCLI(CommandCLI):
     def execute(self) -> None:
-        for container in self.containers:
+        for container in self.get_running_containers():
             self.stop_docker_container(container)
-        # self.execute_shell_command('docker compose down --remove-orphans')
+        self.clean_running_containers()
 
 
 class DBMigrateCommandCLI(CommandCLI):
