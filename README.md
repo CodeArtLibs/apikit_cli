@@ -45,3 +45,12 @@ apikit version
 ```shell
 make publish
 ```
+
+
+# Binary hash check
+
+```shell
+# https://raw.githubusercontent.com/CodeArtLibs/apikit_cli/refs/heads/main/releases/
+apikit version
+shasum -a 256 apikit
+```

@@ -25,7 +25,7 @@ from contextlib import contextmanager
 
 from packaging import version
 
-API_KIT_VERSION = __version__ = '0.2'
+API_KIT_VERSION = __version__ = '0.0'
 DEBUG: bool = False
 
 
@@ -148,7 +148,6 @@ class CommandCLI:
     def __init__(self, **kwargs: typing.Any) -> None:
         print(kwargs)
         self.cli_args: dict[str, typing.Any] = kwargs or {}
-
 
     def execute_shell_command(
         self,

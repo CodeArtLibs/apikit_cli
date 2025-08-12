@@ -1,4 +1,4 @@
-CLI_VERSION := 0.2
+CLI_VERSION := 0.0
 
 # -------------------------------------------------------------------------------------------------
 # CLI Development
@@ -123,9 +123,14 @@ copy_to_template:
 
 all: test build test_bin update copy_to_template
 
-publish:
+# Update CLI_VERSION
+publish: copy_to_template
+	echo $(CLI_VERSION) > releases/latest.txt
 	shasum -a 256 apikit > releases/apikit_$(CLI_VERSION).hash
 	git add releases/latest.txt releases/apikit_$(CLI_VERSION).hash apikit apikit_cli/apikit.py Makefile
+	git commit -m "Release $(CLI_VERSION)"
 	git push origin main
 	git tag $(CLI_VERSION)
 	git push origin $(CLI_VERSION)
+	# Delete Git tag:
+	# git tag -d 0.0 && git push origin :0.0
