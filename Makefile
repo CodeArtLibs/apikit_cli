@@ -119,8 +119,8 @@ copy_to_template:
 
 all: test build test_bin update copy_to_template
 
-publish: all
-	git add version.txt apikit
+publish:
+	git add version.txt apikit apikit_cli/apikit.py Makefile
 	git push origin main
 	git tag $(CLI_VERSION)
 	git push origin $(CLI_VERSION)
