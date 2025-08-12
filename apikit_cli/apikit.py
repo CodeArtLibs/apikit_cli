@@ -23,7 +23,7 @@ from contextlib import contextmanager
 
 from packaging import version
 
-API_KIT_VERSION = __version__ = '0.1'
+API_KIT_VERSION = __version__ = '0.2'
 DEBUG: bool = False
 
 
