@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import argparse
 import configparser
+import getpass
 import os
 import random
 import secrets
@@ -144,8 +145,10 @@ class ShellCmdOutput(typing.TypedDict):
 
 
 class CommandCLI:
-    def __init__(self, **kwargs: str) -> None:
-        pass
+    def __init__(self, **kwargs: typing.Any) -> None:
+        print(kwargs)
+        self.cli_args: dict[str, typing.Any] = kwargs or {}
+
 
     def execute_shell_command(
         self,
@@ -416,14 +419,16 @@ class TestsCommandCLI(CommandCLI):
         app: str = CONFIG['app']
         mongodb_container_name: str = f'{CONFIG["app"]}_tests_mongodb_{random_suffix()}'
         redis_container_name: str = f'{CONFIG["app"]}_tests_redis_{random_suffix()}'
-        mongo_url: str
+        mongodb_url: str
         redis_url: str
-        with self.with_mongodb(mongodb_container_name) as mongo_url, self.with_redis(redis_container_name) as redis_url:
+        with self.with_mongodb(mongodb_container_name) as mongodb_url, self.with_redis(redis_container_name) as redis_url:
             pytest_cmd: str = '/app/env/bin/pytest --asyncio-mode=auto /app/apps -n auto -q --disable-warnings --tb=no'
             self.docker_run(
                 pytest_cmd,
                 host_network=False,
-                MONGODB_URI=mongo_url,
+                DEV_ENV='true',
+                TEST_ENV='true',
+                MONGODB_URI=mongodb_url,
                 MONGODB_NAME=f'{app}_unittest',
                 REDIS_URL=redis_url,
             )
@@ -453,16 +458,21 @@ class StartCommandCLI(CommandCLI):
         app: str = CONFIG['app']
         mongodb_container_name: str = f'{CONFIG["app"]}_dev_mongodb_{random_suffix()}'
         redis_container_name: str = f'{CONFIG["app"]}_dev_redis_{random_suffix()}'
-        mongo_url: str
+        mongodb_url: str
         redis_url: str
-        with self.with_mongodb(mongodb_container_name, '.db') as mongo_url, self.with_redis(redis_container_name) as redis_url:
+        with self.with_mongodb(mongodb_container_name, '.db') as mongodb_url, self.with_redis(redis_container_name) as redis_url:
             api_container_name: str = f'{CONFIG["app"]}_api_{random_suffix()}'
             self.cache_running_containers(api_container_name)
 
-            port: int = find_free_port(start=int(CONFIG['port']), shuffle=False)
-            CONFIG['port'] = str(port)
+            port: str = str(self.cli_args.get('port', ''))
+            if not port:
+                port = str(find_free_port(start=int(CONFIG['port']), shuffle=False))
+            CONFIG['port'] = port
             CONFIG['api_url'] = f'http://localhost:{port}'
             CONFIG['admin_url'] = f'http://localhost:9001/auth/signin?api={CONFIG["api_url"]}'
+            CONFIG['mongodb_url'] = mongodb_url
+            CONFIG['mongodb_db'] = f'{app}_dev'
+            CONFIG['redis_url'] = redis_url
             CONFIG['token'] = secrets.token_hex(64)
             print(yellow('API: ') + CONFIG['api_url'])
             print(yellow('ADMIN: ') + CONFIG['admin_url'])
@@ -472,7 +482,7 @@ class StartCommandCLI(CommandCLI):
                     '/app/env/bin/uvicorn'
                     ' api_web.version_server:asgi_app'
                     ' --host 0.0.0.0'
-                    ' --port 50000'
+                    f' --port {port}'
                     ' --workers 1'
                     ' --loop uvloop'
                     ' --interface asgi3'
@@ -482,12 +492,12 @@ class StartCommandCLI(CommandCLI):
                     ' --reload'
                     ' --reload-dir ./apps'
                 ),
-                port_mapping=f'-p {port}:50000',
+                port_mapping=f'-p {port}:{port}',
                 host_network=False,
                 container_name=api_container_name,
                 DEV_ENV='true',
                 API_VERSION='dev',
-                MONGODB_URI=mongo_url,
+                MONGODB_URI=mongodb_url,
                 MONGODB_NAME=f'{app}_dev',
                 REDIS_URL=redis_url,
                 APIKIT_SECRET_KEY=CONFIG['token'],
@@ -495,7 +505,6 @@ class StartCommandCLI(CommandCLI):
 
         # docker_image: str = CONFIG['docker_image']
         # self.execute_shell_command(f'docker build -f Dockerfile . -t {docker_image}')
-        self.api_request('/status/ping')
         # self.execute_shell_command('docker compose up -d')
         # self.execute_shell_command('docker compose logs -f api_web')
 
@@ -507,24 +516,72 @@ class StopCommandCLI(CommandCLI):
         self.clean_running_containers()
 
 
+class CreateAdminCommandCLI(CommandCLI):
+    def execute(self) -> None:
+        # self.api_request('/data/SchemaChecking', itoken=CONFIG['token'])
+        email: str = input("Enter admin's email: ")
+        password: str = getpass.getpass("Enter admin's password: ")
+
+        if 'mongodb_url' not in CONFIG:
+            print(yellow('Start the API first: apikit start'))
+            return
+        cmd: str = f'/app/env/bin/python commands.py create_admin --email {email} --password {password}'
+        self.docker_run(
+            cmd,
+            MONGODB_URI=CONFIG['mongodb_url'],
+            MONGODB_NAME=CONFIG['mongodb_db'],
+            REDIS_URL=CONFIG['redis_url'],
+            API_VERSION='dev',
+        )
+
+
+class DBChangesCommandCLI(CommandCLI):
+    def execute(self) -> None:
+        # self.api_request('/data/SchemaChecking', itoken=CONFIG['token'])
+        if 'mongodb_url' not in CONFIG:
+            print(yellow('Start the API first: apikit start'))
+            return
+        cmd: str = '/app/env/bin/python commands.py db_changes'
+        self.docker_run(
+            cmd,
+            MONGODB_URI=CONFIG['mongodb_url'],
+            MONGODB_NAME=CONFIG['mongodb_db'],
+            REDIS_URL=CONFIG['redis_url'],
+            API_VERSION='dev',
+        )
+
+
 class DBMigrateCommandCLI(CommandCLI):
     def execute(self) -> None:
-        self.api_request('/data/_setup', itoken=CONFIG['token'])
+        # self.api_request('/data/updatedatabaseschema', itoken=CONFIG['token'])
+        if 'mongodb_url' not in CONFIG:
+            print(yellow('Start the API first: apikit start'))
+            return
+        cmd: str = '/app/env/bin/python commands.py db_migrate'
+        self.docker_run(
+            cmd,
+            MONGODB_URI=CONFIG['mongodb_url'],
+            MONGODB_NAME=CONFIG['mongodb_db'],
+            REDIS_URL=CONFIG['redis_url'],
+            API_VERSION='dev',
+        )
 
 
 class DBCleanCommandCLI(CommandCLI):
     def execute(self) -> None:
-        app: str = CONFIG['app']
-        mongodb_container_name: str = f'{CONFIG["app"]}_dev_mongodb_{random_suffix()}'
-        with self.with_mongodb(mongodb_container_name, '.db') as mongo_url:
-            cmd = (
-                f'env/bin/python -c '
-                "'"
-                'from pymongo import MongoClient; '
-                f"""MongoClient("{mongo_url}").drop_database("{app}_dev")"""
-                "'"
-            )
-            self.docker_run(cmd)
+        if 'mongodb_url' not in CONFIG:
+            print(yellow('Start the API first: apikit start'))
+            return
+        mongodb_url: str = CONFIG['mongodb_url']
+        mongodb_db: str = CONFIG['mongodb_db']
+        cmd = (
+            f'env/bin/python -c '
+            "'"
+            'from pymongo import MongoClient; '
+            f"""MongoClient("{mongodb_url}").drop_database("{mongodb_db}")"""
+            "'"
+        )
+        self.docker_run(cmd)
 
 
 class UpdateDevCommandCLI(CommandCLI):
@@ -578,6 +635,8 @@ COMMANDS: dict[str, type[CommandCLI]] = {
     'start': StartCommandCLI,
     'stop': StopCommandCLI,
     'ping': PingCommandCLI,
+    'create_admin': CreateAdminCommandCLI,
+    'db_changes': DBChangesCommandCLI,
     'db_migrate': DBMigrateCommandCLI,
     'db_clean': DBCleanCommandCLI,
     # CD
@@ -619,6 +678,8 @@ if __name__ == '__main__':
     cli_parser.add_argument('--port', type=int, required=False, default=33333)
     cli_parser = subparsers.add_parser('stop')
     cli_parser = subparsers.add_parser('ping')
+    cli_parser = subparsers.add_parser('create_admin')
+    cli_parser = subparsers.add_parser('db_changes')
     cli_parser = subparsers.add_parser('db_migrate')
     cli_parser = subparsers.add_parser('db_clean')
     # CD

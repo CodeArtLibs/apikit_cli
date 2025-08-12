@@ -61,6 +61,8 @@ test: clear
 	env/bin/python apikit_cli/apikit.py start
 	env/bin/python apikit_cli/apikit.py stop
 	env/bin/python apikit_cli/apikit.py ping
+	env/bin/python apikit_cli/apikit.py create_admin
+	env/bin/python apikit_cli/apikit.py db_changes
 	env/bin/python apikit_cli/apikit.py db_migrate
 	env/bin/python apikit_cli/apikit.py db_clean
 	# CD
@@ -96,6 +98,8 @@ test_bin: clear
 	apikit start
 	apikit stop
 	apikit ping
+	apikit create_admin
+	apikit db_changes
 	apikit db_migrate
 	apikit db_clean
 	# CD

@@ -50,6 +50,7 @@ ci:
 
 start:
 	@../env/bin/python ../apikit_cli/apikit.py start
+	@#../env/bin/python ../apikit_cli/apikit.py start --port 33334
 	@echo '--------------------------------------'
 
 stop:
@@ -58,6 +59,14 @@ stop:
 
 ping:
 	@../env/bin/python ../apikit_cli/apikit.py ping
+	@echo '--------------------------------------'
+
+create_admin:
+	@../env/bin/python ../apikit_cli/apikit.py create_admin
+	@echo '--------------------------------------'
+
+db_changes:
+	@../env/bin/python ../apikit_cli/apikit.py db_changes
 	@echo '--------------------------------------'
 
 db_migrate:
