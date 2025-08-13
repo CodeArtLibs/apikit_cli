@@ -230,12 +230,12 @@ class CommandCLI:
         interactive: bool = False,
         capture_output: bool = False,
         detached: bool = False,
+        # -p HOST_PORT:CONTAINER_PORT
         port_mapping: str = '',
         host_network: bool = False,
         container_name: str = '',
         **env: str,
     ) -> None:
-        # -p HOST_PORT:CONTAINER_PORT
         docker_image: str = CONFIG['docker_image']
         host_cmd: str
         env_vars: str = ' '.join([arg for k, v in env.items() for arg in ('-e', f'{k}={v}')])
@@ -258,8 +258,7 @@ class CommandCLI:
 
     def run_mongodb(self, container_name: str, storage_folder: str = '', network_host: bool = False) -> str:
         """
-        docker start container_name
-        docker stop container_name
+        docker start container_name ; docker stop container_name
         """
 
         port: int = find_free_port(shuffle=True)
@@ -275,8 +274,7 @@ class CommandCLI:
 
     def run_redis(self, container_name: str, network_host: bool = False) -> str:
         """
-        docker start container_name
-        docker stop container_name
+        docker start container_name ; docker stop container_name
         """
 
         port: int = find_free_port(shuffle=True)
@@ -289,7 +287,7 @@ class CommandCLI:
             return f'redis://host.docker.internal:{port}/0'
 
     def stop_docker_container(self, container_name: str) -> None:
-        # stop => kill
+        # stop => wait 3s => kill
         self.execute_shell_command(f'docker stop -t 3 {container_name}', capture_output=True)
 
     @contextmanager
@@ -437,15 +435,12 @@ class BuildCommandCLI(CommandCLI):
     def execute(self) -> None:
         docker_image: str = CONFIG['docker_image']
         self.execute_shell_command(f'docker build -f Dockerfile . -t {docker_image}')
-        # self.execute_shell_command(f'docker compose build --no-cache api_web')
 
 
 class RebuildCommandCLI(CommandCLI):
     def execute(self) -> None:
         docker_image: str = CONFIG['docker_image']
         self.execute_shell_command(f'docker build --no-cache -f Dockerfile . -t {docker_image}')
-        # self.execute_shell_command(f'docker compose rm api_web')
-        # self.execute_shell_command(f'docker compose build --no-cache api_web')
 
 
 class CICommandCLI(CommandCLIComposite):
@@ -502,11 +497,6 @@ class StartCommandCLI(CommandCLI):
                 APIKIT_SECRET_KEY=CONFIG['token'],
             )
 
-        # docker_image: str = CONFIG['docker_image']
-        # self.execute_shell_command(f'docker build -f Dockerfile . -t {docker_image}')
-        # self.execute_shell_command('docker compose up -d')
-        # self.execute_shell_command('docker compose logs -f api_web')
-
 
 class StopCommandCLI(CommandCLI):
     def execute(self) -> None:
@@ -517,7 +507,6 @@ class StopCommandCLI(CommandCLI):
 
 class CreateAdminCommandCLI(CommandCLI):
     def execute(self) -> None:
-        # self.api_request('/data/SchemaChecking', itoken=CONFIG['token'])
         email: str = input("Enter admin's email: ")
         password: str = getpass.getpass("Enter admin's password: ")
 
@@ -536,7 +525,6 @@ class CreateAdminCommandCLI(CommandCLI):
 
 class DBChangesCommandCLI(CommandCLI):
     def execute(self) -> None:
-        # self.api_request('/data/SchemaChecking', itoken=CONFIG['token'])
         if 'mongodb_url' not in CONFIG:
             print(yellow('Start the API first: apikit start'))
             return
@@ -552,7 +540,6 @@ class DBChangesCommandCLI(CommandCLI):
 
 class DBMigrateCommandCLI(CommandCLI):
     def execute(self) -> None:
-        # self.api_request('/data/updatedatabaseschema', itoken=CONFIG['token'])
         if 'mongodb_url' not in CONFIG:
             print(yellow('Start the API first: apikit start'))
             return
@@ -607,7 +594,6 @@ class PingCommandCLI(CommandCLI):
 
 class PythonCommandCLI(CommandCLI):
     def execute(self) -> None:
-        # FIXME: use App's image
         self.docker_run('env/bin/python', interactive=True)
 
 
