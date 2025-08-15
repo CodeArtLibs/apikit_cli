@@ -12,7 +12,7 @@ make test
 make build
 make test_bin
 make update
-make copy_to_template
+make copy
 make all
 ```
 

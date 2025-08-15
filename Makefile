@@ -118,13 +118,14 @@ update: build
 	rm releases/latest.txt
 	echo $(CLI_VERSION) > releases/latest.txt
 
-copy_to_template:
+copy:
 	cp apikit ../apikit_template
+	cp apikit ../apikit_actions
 
-all: test build test_bin update copy_to_template
+all: test build test_bin update copy
 
 # Update Makefile/CLI_VERSION and apikit.py/API_KIT_VERSION
-publish: copy_to_template
+publish: copy
 	echo $(CLI_VERSION) > releases/latest.txt
 	shasum -a 256 apikit > releases/apikit_$(CLI_VERSION).hash
 	git add releases/latest.txt releases/apikit_$(CLI_VERSION).hash apikit apikit_cli/apikit.py Makefile
