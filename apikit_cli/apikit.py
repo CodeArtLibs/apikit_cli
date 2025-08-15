@@ -146,7 +146,6 @@ class ShellCmdOutput(typing.TypedDict):
 
 class CommandCLI:
     def __init__(self, **kwargs: typing.Any) -> None:
-        print(kwargs)
         self.cli_args: dict[str, typing.Any] = kwargs or {}
 
     def execute_shell_command(
@@ -491,10 +490,12 @@ class StartCommandCLI(CommandCLI):
                 container_name=api_container_name,
                 DEV_ENV='true',
                 API_VERSION='dev',
+                APP=app,
                 MONGODB_URI=mongodb_url,
                 MONGODB_NAME=f'{app}_dev',
                 REDIS_URL=redis_url,
                 APIKIT_SECRET_KEY=CONFIG['token'],
+                APIKIT_LOG_PRINT_MIN_LEVEL='info' if self.cli_args.get('verbose') else 'success'
             )
 
 
@@ -661,6 +662,7 @@ if __name__ == '__main__':
     # Dev
     cli_parser = subparsers.add_parser('start')
     cli_parser.add_argument('--port', type=int, required=False, default=33333)
+    cli_parser.add_argument('--verbose', action='store_true')
     cli_parser = subparsers.add_parser('stop')
     cli_parser = subparsers.add_parser('ping')
     cli_parser = subparsers.add_parser('create_admin')

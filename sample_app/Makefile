@@ -50,7 +50,7 @@ ci:
 
 start:
 	@../env/bin/python ../apikit_cli/apikit.py start
-	@#../env/bin/python ../apikit_cli/apikit.py start --port 33334
+	@#../env/bin/python ../apikit_cli/apikit.py start --port 33334 --verbose
 	@echo '--------------------------------------'
 
 stop:
