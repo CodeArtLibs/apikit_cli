@@ -369,10 +369,33 @@ class VersionCommandCLI(CommandCLI):
 
 class CheckCommandCLI(CommandCLI):
     def execute(self) -> None:
+        error: bool = False
+        # 1. Check Docker is installed
         output: ShellCmdOutput = self.execute_shell_command('docker --version')
         if output['error']:
             print(red('Docker not found or it is not running.'))
-        print(green('Env is OK.'))
+            error = True
+        # 2. Check Python.packaging is installed
+        try:
+            import packaging
+        except ImportError:
+            print('packaging ' + red('module is required.'))
+            error = True
+        # 3. Check Dockerfile exists
+        if not os.path.isfile('Dockerfile'):
+            print('Dockerfile ' + red('is required.'))
+            error = True
+        # 4. Check requirements-app.txt exists
+        if not os.path.isfile('requirements-app.txt'):
+            print('requirements-app.txt ' + yellow('is recommended.'))
+        # 4. Check apps folder exists
+        if not os.path.isdir('apps'):
+            print('apps ' + red('dir is required.'))
+            error = True
+        if error:
+            print(red('Env is not OK.'))
+        else:
+            print(green('Env is OK.'))
 
 
 class UpgradeCommandCLI(CommandCLI):
