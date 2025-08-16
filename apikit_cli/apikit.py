@@ -223,6 +223,16 @@ class CommandCLI:
         #                 # ignore for now, for mypyc
         #                 print(str(e), layer='shell')
 
+    def check_docker_image_exists(self, docker_image: str) -> bool:
+        # :docker_image: {app}:dev
+        try:
+            subprocess.run(
+                ['docker', 'image', 'inspect', docker_image], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
+            return True
+        except subprocess.CalledProcessError:
+            return False
+
     def docker_run(
         self,
         container_cmd: str,
@@ -236,6 +246,17 @@ class CommandCLI:
         **env: str,
     ) -> None:
         docker_image: str = CONFIG['docker_image']
+
+        if not self.check_docker_image_exists(docker_image):
+            if self.cli_args.get('auto_build', True):
+                if os.path.isfile('Dockerfile'):
+                    print(yellow(f'Building Docker image {docker_image}'))
+                    self.execute_shell_command(f'docker build -f Dockerfile . -t {docker_image}')
+                    # Rebuild
+                    # self.execute_shell_command(f'docker build --no-cache -f Dockerfile . -t {docker_image}')
+                else:
+                    print(red(f'Missing Dockerfile to compile {docker_image}'))
+
         host_cmd: str
         env_vars: str = ' '.join([arg for k, v in env.items() for arg in ('-e', f'{k}={v}')])
         network: str = '--network host' if host_network else '--add-host=host.docker.internal:host-gateway'
@@ -433,13 +454,19 @@ class TestsCommandCLI(CommandCLI):
 class BuildCommandCLI(CommandCLI):
     def execute(self) -> None:
         docker_image: str = CONFIG['docker_image']
-        self.execute_shell_command(f'docker build -f Dockerfile . -t {docker_image}')
+        if os.path.isfile('Dockerfile'):
+            self.execute_shell_command(f'docker build -f Dockerfile . -t {docker_image}')
+        else:
+            print(red(f'Missing Dockerfile to compile {docker_image}'))
 
 
 class RebuildCommandCLI(CommandCLI):
     def execute(self) -> None:
         docker_image: str = CONFIG['docker_image']
-        self.execute_shell_command(f'docker build --no-cache -f Dockerfile . -t {docker_image}')
+        if os.path.isfile('Dockerfile'):
+            self.execute_shell_command(f'docker build --no-cache -f Dockerfile . -t {docker_image}')
+        else:
+            print(red(f'Missing Dockerfile to re-compile {docker_image}'))
 
 
 class CICommandCLI(CommandCLIComposite):
@@ -495,7 +522,7 @@ class StartCommandCLI(CommandCLI):
                 MONGODB_NAME=f'{app}_dev',
                 REDIS_URL=redis_url,
                 APIKIT_SECRET_KEY=CONFIG['token'],
-                APIKIT_LOG_PRINT_MIN_LEVEL='info' if self.cli_args.get('verbose') else 'success'
+                APIKIT_LOG_PRINT_MIN_LEVEL='info' if self.cli_args.get('verbose') else 'success',
             )
 
 

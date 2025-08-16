@@ -132,8 +132,8 @@ publish: copy
 	git push origin main
 	git tag v$(CLI_VERSION)
 	git push origin v$(CLI_VERSION)
-	# Delete Git tag:
-	# git tag -d v0.0 && git push origin :v0.0
+	# Manual trigger: git tag v0.0 && git push origin v0.0
+	# Delete release: git tag -d v0.0 && git push origin :v0.0
 
 
 # -------------------------------------------------------------------------------------------------
