@@ -24,8 +24,6 @@ import typing
 import urllib.request
 from contextlib import contextmanager
 
-from packaging import version
-
 API_KIT_VERSION = __version__ = '0.0'
 DEBUG: bool = False
 
@@ -107,6 +105,16 @@ def find_free_port(start: int = 33200, end: int = 33299, shuffle: bool = False) 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(('', 0))
         return int(s.getsockname()[1])
+
+
+def version_lower_than(v1: str, v2: str) -> bool:
+    parts1 = [int(p) for p in v1.split('.')]
+    parts2 = [int(p) for p in v2.split('.')]
+    # Pad shorter version with zeros
+    length = max(len(parts1), len(parts2))
+    parts1 += [0] * (length - len(parts1))
+    parts2 += [0] * (length - len(parts2))
+    return parts1 < parts2
 
 
 def get_app_config() -> dict[str, typing.Any]:
@@ -397,23 +405,18 @@ class CheckCommandCLI(CommandCLI):
         if output['error']:
             print(red('Docker not found or it is not running.'))
             error = True
-        # 2. Check Python.packaging is installed
-        try:
-            import packaging
-        except ImportError:
-            print('packaging ' + red('module is required.'))
-            error = True
-        # 3. Check Dockerfile exists
+        # 2. Check Dockerfile exists
         if not os.path.isfile('Dockerfile'):
             print('Dockerfile ' + red('is required.'))
             error = True
-        # 4. Check requirements-app.txt exists
+        # 3. Check requirements-app.txt exists
         if not os.path.isfile('requirements-app.txt'):
             print('requirements-app.txt ' + yellow('is recommended.'))
         # 4. Check apps folder exists
         if not os.path.isdir('apps'):
             print('apps ' + red('dir is required.'))
             error = True
+        # Result
         if error:
             print(red('Env is not OK.'))
         else:
@@ -424,7 +427,7 @@ class UpgradeCommandCLI(CommandCLI):
     def execute(self) -> None:
         try:
             latest_version: str = self.latest_version()
-            if version.parse(latest_version) > version.parse(API_KIT_VERSION):
+            if version_lower_than(latest_version, API_KIT_VERSION):
                 print(yellow(f'APIKit CLI is out to date. Current {API_KIT_VERSION}. Latest {latest_version}'))
                 self.upgrade_apikit_cli()
             else:
