@@ -1,4 +1,4 @@
-name: Build APIKit CLI Binaries
+name: Release APIKit CLI Binaries
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch: # manual trigger
 
 jobs:
-  build:
+  release:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
@@ -38,6 +38,9 @@ jobs:
           CLI_FILENAME="dist/apikit-${{ runner.os }}-${{ runner.arch }}-$APIKIT_CLI_VERSION"
           CLI_FILENAME=$(echo "$CLI_FILENAME" | tr '[:upper:]' '[:lower:]')
           echo "CLI_FILENAME=$CLI_FILENAME" >> $GITHUB_ENV
+          LATEST_CLI_FILENAME="dist/apikit-${{ runner.os }}-${{ runner.arch }}-latest"
+          LATEST_CLI_FILENAME=$(echo "$LATEST_CLI_FILENAME" | tr '[:upper:]' '[:lower:]')
+          echo "LATEST_CLI_FILENAME=$LATEST_CLI_FILENAME" >> $GITHUB_ENV
           echo "$CLI_FILENAME"
 
       - name: Build binary
@@ -73,8 +76,19 @@ jobs:
           # Automatically defined by GH
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # https://github.com/CodeArtLibs/apikit_cli/releases/latest
       - name: Update latest release
+        shell: bash
+        run: |
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            cp $CLI_FILENAME.exe $LATEST_CLI_FILENAME.exe
+            cp $CLI_FILENAME.hash $LATEST_CLI_FILENAME.hash
+          else
+            cp $CLI_FILENAME $LATEST_CLI_FILENAME
+            cp $CLI_FILENAME.hash $LATEST_CLI_FILENAME.hash
+          fi
+
+      # https://github.com/CodeArtLibs/apikit_cli/releases/latest
+      - name: Upload latest release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest

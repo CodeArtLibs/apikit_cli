@@ -130,10 +130,10 @@ publish: copy
 	git add releases/latest.txt releases/apikit_$(CLI_VERSION).hash apikit apikit_cli/apikit.py Makefile
 	git commit -m "Release $(CLI_VERSION)"
 	git push origin main
-	git tag $(CLI_VERSION)
-	git push origin $(CLI_VERSION)
+	git tag v$(CLI_VERSION)
+	git push origin v$(CLI_VERSION)
 	# Delete Git tag:
-	# git tag -d 0.0 && git push origin :0.0
+	# git tag -d v0.0 && git push origin :v0.0
 
 
 # -------------------------------------------------------------------------------------------------
