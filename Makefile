@@ -120,7 +120,6 @@ update: build
 
 copy:
 	cp apikit ../apikit_template
-	cp apikit ../apikit_actions
 
 all: test build test_bin update copy
 
@@ -135,3 +134,27 @@ publish: copy
 	git push origin $(CLI_VERSION)
 	# Delete Git tag:
 	# git tag -d 0.0 && git push origin :0.0
+
+
+# -------------------------------------------------------------------------------------------------
+# Act
+
+act_install: clear
+	brew install act
+
+act_docker_image: clear
+	docker pull catthehacker/ubuntu:act-latest
+	#docker pull nektos/act
+
+act_list: clear
+	act --list
+
+act_check: clear
+	act --dryrun -W .github/workflows/build.yaml
+
+act_build: clear
+	# -e event.json
+	act -W .github/workflows/build.yaml --job build
+
+act_all: clear
+	ACTIONS_STEP_DEBUG=false act --quiet
