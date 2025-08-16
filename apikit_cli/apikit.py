@@ -8,6 +8,7 @@ import argparse
 import configparser
 import getpass
 import os
+import platform
 import random
 import secrets
 import shlex
@@ -59,6 +60,27 @@ def cyan(string: str) -> str:
 
 def random_suffix(length: int = 8) -> str:
     return secrets.token_hex(length // 2)
+
+
+def get_platform_arch() -> str:
+    system = platform.system().lower()  # 'linux', 'darwin', 'windows'
+    arch = platform.machine().lower()  # 'x86_64', 'arm64', etc.
+
+    # Normalize OS
+    if system == 'darwin':
+        system = 'macos'
+    elif system == 'windows':
+        system = 'windows'
+    elif system == 'linux':
+        system = 'linux'
+
+    # Normalize architecture
+    if arch in ('x86_64', 'amd64'):
+        arch = 'x64'
+    elif arch in ('aarch64', 'arm64'):
+        arch = 'arm64'
+
+    return f'{system}-{arch}'
 
 
 def find_repo_root(start_path: str | None = None) -> str | None:
@@ -420,7 +442,14 @@ class UpgradeCommandCLI(CommandCLI):
 
     def upgrade_apikit_cli(self) -> None:
         try:
-            url: str = 'https://raw.githubusercontent.com/CodeArtLibs/apikit_cli/refs/heads/main/apikit'
+            # apikit-linux-x64-latest
+            # apikit-macos-arm64-latest
+            # apikit-windows-x64-latest.exe
+            platform_arch: str = get_platform_arch()
+            platform_file: str = f'apikit-{platform_arch}-latest'
+            if platform_arch.startswith('windows'):
+                platform_file += '.exe'
+            url: str = f'https://github.com/CodeArtLibs/apikit_cli/releases/download/latest/{platform_file}'
             context = ssl._create_unverified_context()
             with urllib.request.urlopen(url, context=context) as response:
                 data = response.read()
@@ -428,7 +457,8 @@ class UpgradeCommandCLI(CommandCLI):
                     f.write(data)
                 # Downloading from GitHub it lost its executable permission
                 os.chmod('apikit_new', os.stat('apikit_new').st_mode | stat.S_IEXEC)
-            shutil.copy('apikit', 'apikit_old')
+            if os.path.exists('apikit'):
+                shutil.copy('apikit', 'apikit_old')
             shutil.copy('apikit_new', 'apikit')
             os.remove('apikit_new')
             print(green('Updated. Restarting...'))
