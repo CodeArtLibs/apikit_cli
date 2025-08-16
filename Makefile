@@ -119,12 +119,13 @@ update: build
 	echo $(CLI_VERSION) > releases/latest.txt
 
 copy:
+	# Just for debug
 	cp apikit ../apikit_template
 
 all: test build test_bin update copy
 
 # Update Makefile/CLI_VERSION and apikit.py/API_KIT_VERSION
-publish: copy
+publish:
 	echo $(CLI_VERSION) > releases/latest.txt
 	shasum -a 256 apikit > releases/apikit_$(CLI_VERSION).hash
 	git add releases/latest.txt releases/apikit_$(CLI_VERSION).hash apikit apikit_cli/apikit.py Makefile
