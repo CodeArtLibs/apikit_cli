@@ -2,9 +2,9 @@ name: Build APIKit CLI Binaries
 
 on:
   push:
-    branches:
-      - main
-  workflow_dispatch:
+    tags:
+      - 'v*.*' # triggers on tags like v1.2
+  workflow_dispatch: # manual trigger
 
 jobs:
   build:
@@ -15,11 +15,11 @@ jobs:
     permissions:
       contents: write
 
-    env:
-        APIKIT_CLI_VERSION: nightly
-
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set CLI version
+        run: echo "APIKIT_CLI_VERSION=${GITHUB_REF##*/}" >> $GITHUB_ENV
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -63,12 +63,21 @@ jobs:
           $hash = Get-FileHash -Algorithm SHA256 "$env:CLI_FILENAME.exe"
           $hash.Hash | Out-File "$env:CLI_FILENAME.hash" -Encoding ascii
 
-      # https://github.com/CodeArtLibs/apikit_cli/releases/tag/nightly
+      # https://github.com/CodeArtLibs/apikit_cli/releases/
       - name: Upload release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: nightly
-          prerelease: true
+          tag_name: ${{ env.APIKIT_CLI_VERSION }}
+          files: dist/*
+        env:
+          # Automatically defined by GH
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # https://github.com/CodeArtLibs/apikit_cli/releases/latest
+      - name: Update latest release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
           files: dist/*
         env:
           # Automatically defined by GH
