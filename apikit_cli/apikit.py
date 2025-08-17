@@ -17,7 +17,6 @@ import socket
 import ssl
 import stat
 import subprocess
-import sys
 import tempfile
 import time
 import typing
@@ -469,16 +468,17 @@ class UpgradeCommandCLI(CommandCLI):
             context = ssl._create_unverified_context()
             with urllib.request.urlopen(url, context=context) as response:
                 data = response.read()
-                with open('apikit_new', 'wb') as f:
-                    f.write(data)
-                # Downloading from GitHub it lost its executable permission
-                os.chmod('apikit_new', os.stat('apikit_new').st_mode | stat.S_IEXEC)
+            with open('apikit_new', 'wb') as f:
+                f.write(data)
+            # Downloading from GitHub it lost its executable permission
+            os.chmod('apikit_new', os.stat('apikit_new').st_mode | stat.S_IEXEC)
             if os.path.exists('apikit'):
                 shutil.copy('apikit', 'apikit_old')
             shutil.copy('apikit_new', 'apikit')
             os.remove('apikit_new')
             print(green('Updated. Restarting...'))
-            os.execv(sys.executable, [sys.executable, *sys.argv])
+            # print(' '.join([sys.executable, *sys.argv]))
+            # os.execv(sys.executable, [sys.executable, *sys.argv])
         except Exception as e:
             print(red(str(e)))
             print(yellow('Updated check failed'))
