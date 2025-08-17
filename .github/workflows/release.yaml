@@ -72,6 +72,8 @@ jobs:
         with:
           tag_name: ${{ env.APIKIT_CLI_VERSION }}
           files: dist/*
+          overwrite: true
+          make_latest: true
         env:
           # Automatically defined by GH
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
