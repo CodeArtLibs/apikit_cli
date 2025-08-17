@@ -287,6 +287,11 @@ class CommandCLI:
                     print(red(f'Missing Dockerfile to compile {docker_image}'))
 
         host_cmd: str
+
+        env = env or {}
+        env['DEV_ENV'] = 'true'
+        env['APP'] = CONFIG['app']
+        env['API_VERSION'] ='dev'
         env_vars: str = ' '.join([arg for k, v in env.items() for arg in ('-e', f'{k}={v}')])
         network: str = '--network host' if host_network else '--add-host=host.docker.internal:host-gateway'
         detached_attr: str = '-d' if detached else ''
@@ -516,7 +521,6 @@ class TestsCommandCLI(CommandCLI):
             self.docker_run(
                 pytest_cmd,
                 host_network=False,
-                DEV_ENV='true',
                 TEST_ENV='true',
                 MONGODB_URI=mongodb_url,
                 MONGODB_NAME=f'{app}_unittest',
@@ -548,7 +552,11 @@ class CICommandCLI(CommandCLIComposite):
 
 class InfoCommandCLI(CommandCLI):
     def execute(self) -> None:
-        self.docker_run('env/bin/python -c "from api_web import main ; main.check()"')
+        app: str = CONFIG['app']
+        self.docker_run(
+            'env/bin/python -c "from api_web import main ; main.check()"',
+            # APIKIT_LOG_PRINT_MIN_LEVEL='info' if self.cli_args.get('verbose') else 'success',
+        )
 
 
 class StartCommandCLI(CommandCLI):
@@ -593,9 +601,6 @@ class StartCommandCLI(CommandCLI):
                 port_mapping=f'-p {port}:{port}',
                 host_network=False,
                 container_name=api_container_name,
-                DEV_ENV='true',
-                API_VERSION='dev',
-                APP=app,
                 MONGODB_URI=mongodb_url,
                 MONGODB_NAME=f'{app}_dev',
                 REDIS_URL=redis_url,
@@ -625,7 +630,6 @@ class CreateAdminCommandCLI(CommandCLI):
             MONGODB_URI=CONFIG['mongodb_url'],
             MONGODB_NAME=CONFIG['mongodb_db'],
             REDIS_URL=CONFIG['redis_url'],
-            API_VERSION='dev',
         )
 
 
@@ -640,7 +644,6 @@ class DBChangesCommandCLI(CommandCLI):
             MONGODB_URI=CONFIG['mongodb_url'],
             MONGODB_NAME=CONFIG['mongodb_db'],
             REDIS_URL=CONFIG['redis_url'],
-            API_VERSION='dev',
         )
 
 
@@ -655,7 +658,6 @@ class DBMigrateCommandCLI(CommandCLI):
             MONGODB_URI=CONFIG['mongodb_url'],
             MONGODB_NAME=CONFIG['mongodb_db'],
             REDIS_URL=CONFIG['redis_url'],
-            API_VERSION='dev',
         )
 
 
