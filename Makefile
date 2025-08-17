@@ -110,6 +110,10 @@ test_bin: clear
 	apikit python
 	apikit report_bug
 
+
+# -------------------------------------------------------------------------------------------------
+# APIKit CLI Release
+
 update: build
 	# Nuitka
 	cp ./dist/apikit.bin apikit
@@ -127,8 +131,7 @@ all: test build test_bin update copy
 # Update Makefile/CLI_VERSION and apikit.py/API_KIT_VERSION
 publish:
 	echo $(CLI_VERSION) > releases/latest.txt
-	shasum -a 256 apikit > releases/apikit_$(CLI_VERSION).hash
-	git add releases/latest.txt releases/apikit_$(CLI_VERSION).hash apikit apikit_cli/apikit.py Makefile
+	git add releases/latest.txt apikit_cli/apikit.py Makefile
 	git commit -m "Release $(CLI_VERSION)"
 	git push origin main
 	git tag v$(CLI_VERSION)
