@@ -23,7 +23,7 @@ import typing
 import urllib.request
 from contextlib import contextmanager
 
-API_KIT_VERSION = __version__ = '0.3'
+API_KIT_VERSION = __version__ = '0.4'
 DEBUG: bool = False
 
 
