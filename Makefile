@@ -58,6 +58,7 @@ test_commands:
 	env/bin/python apikit_cli/apikit.py rebuild
 	env/bin/python apikit_cli/apikit.py ci
 	# Dev
+	env/bin/python apikit_cli/apikit.py info
 	env/bin/python apikit_cli/apikit.py start
 	env/bin/python apikit_cli/apikit.py stop
 	env/bin/python apikit_cli/apikit.py ping
@@ -102,6 +103,7 @@ test_bin: clear
 	apikit rebuild
 	apikit ci
 	# Dev
+	apikit info
 	apikit start
 	apikit stop
 	apikit ping

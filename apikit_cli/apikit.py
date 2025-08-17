@@ -546,6 +546,11 @@ class CICommandCLI(CommandCLIComposite):
     commands: typing.ClassVar[list[str]] = ['format', 'lint', 'compile', 'build', 'tests']
 
 
+class InfoCommandCLI(CommandCLI):
+    def execute(self) -> None:
+        self.docker_run('env/bin/python -c "from api_web import main ; main.check()"')
+
+
 class StartCommandCLI(CommandCLI):
     def execute(self) -> None:
         app: str = CONFIG['app']
@@ -718,6 +723,7 @@ COMMANDS: dict[str, type[CommandCLI]] = {
     'rebuild': RebuildCommandCLI,
     'ci': CICommandCLI,
     # Dev
+    'info': InfoCommandCLI,
     'start': StartCommandCLI,
     'stop': StopCommandCLI,
     'ping': PingCommandCLI,
@@ -763,6 +769,7 @@ if __name__ == '__main__':
     cli_parser = subparsers.add_parser('rebuild')
     cli_parser = subparsers.add_parser('ci')
     # Dev
+    cli_parser = subparsers.add_parser('info')
     cli_parser = subparsers.add_parser('start')
     cli_parser.add_argument('--port', type=int, required=False, default=33333)
     cli_parser.add_argument('--verbose', action='store_true')
