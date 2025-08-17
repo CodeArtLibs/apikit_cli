@@ -494,8 +494,9 @@ class TestsCommandCLI(CommandCLI):
         redis_container_name: str = f'{CONFIG["app"]}_tests_redis_{random_suffix()}'
         mongodb_url: str
         redis_url: str
+        custom_apps_dir: str = os.getenv('APIKIT_APPS_DIR', '')
         with self.with_mongodb(mongodb_container_name) as mongodb_url, self.with_redis(redis_container_name) as redis_url:
-            pytest_cmd: str = '/app/env/bin/pytest --asyncio-mode=auto /app/apps -n auto -q --disable-warnings --tb=no'
+            pytest_cmd: str = f'/app/env/bin/pytest --asyncio-mode=auto /app/apps {custom_apps_dir} -n auto -q --disable-warnings --tb=no'
             self.docker_run(
                 pytest_cmd,
                 host_network=False,
