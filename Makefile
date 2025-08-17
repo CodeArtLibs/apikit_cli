@@ -1,4 +1,4 @@
-CLI_VERSION := 0.1
+CLI_VERSION := $$(env/bin/python apikit_cli/apikit.py version --simple)
 
 # -------------------------------------------------------------------------------------------------
 # CLI Development
@@ -122,8 +122,6 @@ update: build
 	cp ./dist/apikit.bin apikit
 	# PyInstaller
 	#cp ./dist/apikit apikit
-	rm releases/latest.txt
-	echo $(CLI_VERSION) > releases/latest.txt
 
 copy:
 	# Just for debug
@@ -133,7 +131,8 @@ all: test build test_bin update copy
 
 # Update Makefile/CLI_VERSION and apikit.py/API_KIT_VERSION
 release:
-	echo $(CLI_VERSION) > releases/latest.txt
+	@echo "Releasing version $(CLI_VERSION)"
+	@echo $(CLI_VERSION) > releases/latest.txt
 	git add releases/latest.txt apikit_cli/apikit.py Makefile
 	git commit -m "Release $(CLI_VERSION)"
 	git push origin main

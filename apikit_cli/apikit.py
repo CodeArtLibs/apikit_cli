@@ -24,7 +24,7 @@ import typing
 import urllib.request
 from contextlib import contextmanager
 
-API_KIT_VERSION = __version__ = '0.0'
+API_KIT_VERSION = __version__ = '0.1'
 DEBUG: bool = False
 
 
@@ -401,9 +401,12 @@ class CommandCLIComposite(CommandCLI):
 
 class VersionCommandCLI(CommandCLI):
     def execute(self) -> None:
-        print('APIKit CLI')
-        print(f'Current version: {API_KIT_VERSION}')
-        print(f'Latest version:  {self.latest_version()}')
+        if self.cli_args.get('simple'):
+            print(API_KIT_VERSION)
+        else:
+            print('APIKit CLI')
+            print(f'Current version: {API_KIT_VERSION}')
+            print(f'Latest version:  {self.latest_version()}')
 
 
 class CheckCommandCLI(CommandCLI):
@@ -745,6 +748,7 @@ if __name__ == '__main__':
     cli_parser: argparse.ArgumentParser
     # Env
     cli_parser = subparsers.add_parser('version')
+    cli_parser.add_argument('--simple', action='store_true')
     cli_parser = subparsers.add_parser('check')
     cli_parser = subparsers.add_parser('upgrade')
     cli_parser.add_argument('--reinstall', action='store_true')
