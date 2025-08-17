@@ -43,6 +43,7 @@ def test_base_command():
 
     class TestComposite(CommandCLIComposite):
         commands = ['version', 'version']
+
     cmd = TestComposite()
     cmd.execute()
 

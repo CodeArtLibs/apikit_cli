@@ -108,10 +108,10 @@ def find_free_port(start: int = 33200, end: int = 33299, shuffle: bool = False) 
 
 
 def version_lower_than(v1: str, v2: str) -> bool:
-    parts1 = [int(p) for p in v1.split('.')]
-    parts2 = [int(p) for p in v2.split('.')]
+    parts1: list[int] = [int(p) for p in v1.split('.')]
+    parts2: list[int] = [int(p) for p in v2.split('.')]
     # Pad shorter version with zeros
-    length = max(len(parts1), len(parts2))
+    length: int = max(len(parts1), len(parts2))
     parts1 += [0] * (length - len(parts1))
     parts2 += [0] * (length - len(parts2))
     return parts1 < parts2
@@ -306,6 +306,13 @@ class CommandCLI:
     def api_request(self, path: str, method: str = 'POST', **headers: str) -> None:
         self.execute_shell_command(f'http --verify=no --follow POST {CONFIG["api_url"]}{path}')
 
+    def latest_version(self) -> str:
+        url: str = 'https://raw.githubusercontent.com/CodeArtLibs/apikit_cli/refs/heads/main/releases/latest.txt'
+        context = ssl._create_unverified_context()
+        with urllib.request.urlopen(url, context=context) as response:
+            return str(response.read().decode('utf-8').strip())
+        return API_KIT_VERSION
+
     def run_mongodb(self, container_name: str, storage_folder: str = '', network_host: bool = False) -> str:
         """
         docker start container_name ; docker stop container_name
@@ -394,7 +401,9 @@ class CommandCLIComposite(CommandCLI):
 
 class VersionCommandCLI(CommandCLI):
     def execute(self) -> None:
-        print(f'APIKit version {API_KIT_VERSION}')
+        print('APIKit CLI')
+        print(f'Current version: {API_KIT_VERSION}')
+        print(f'Latest version:  {self.latest_version()}')
 
 
 class CheckCommandCLI(CommandCLI):
@@ -416,6 +425,11 @@ class CheckCommandCLI(CommandCLI):
         if not os.path.isdir('apps'):
             print('apps ' + red('dir is required.'))
             error = True
+        # 5. Check APIKit CLI
+        latest_version: str = self.latest_version()
+        if version_lower_than(API_KIT_VERSION, latest_version):
+            print(yellow(f'APIKit CLI is out to date. Current {API_KIT_VERSION}. Latest {latest_version}'))
+
         # Result
         if error:
             print(red('Env is not OK.'))
@@ -430,7 +444,7 @@ class UpgradeCommandCLI(CommandCLI):
                 self.upgrade_apikit_cli()
             else:
                 latest_version: str = self.latest_version()
-                if version_lower_than(latest_version, API_KIT_VERSION):
+                if version_lower_than(API_KIT_VERSION, latest_version):
                     print(yellow(f'APIKit CLI is out to date. Current {API_KIT_VERSION}. Latest {latest_version}'))
                     self.upgrade_apikit_cli()
                 else:
@@ -438,13 +452,6 @@ class UpgradeCommandCLI(CommandCLI):
         except Exception as e:
             print(red(str(e)))
             print(yellow('Update check failed.'))
-
-    def latest_version(self) -> str:
-        url: str = 'https://raw.githubusercontent.com/CodeArtLibs/apikit_cli/refs/heads/main/releases/latest.txt'
-        context = ssl._create_unverified_context()
-        with urllib.request.urlopen(url, context=context) as response:
-            return str(response.read().decode('utf-8').strip())
-        return API_KIT_VERSION
 
     def upgrade_apikit_cli(self) -> None:
         try:
@@ -499,7 +506,9 @@ class TestsCommandCLI(CommandCLI):
         redis_url: str
         custom_apps_dir: str = os.getenv('APIKIT_APPS_DIR', '')
         with self.with_mongodb(mongodb_container_name) as mongodb_url, self.with_redis(redis_container_name) as redis_url:
-            pytest_cmd: str = f'/app/env/bin/pytest --asyncio-mode=auto /app/apps {custom_apps_dir} -n auto -q --disable-warnings --tb=no'
+            pytest_cmd: str = (
+                f'/app/env/bin/pytest --asyncio-mode=auto /app/apps {custom_apps_dir} -n auto -q --disable-warnings --tb=no'
+            )
             self.docker_run(
                 pytest_cmd,
                 host_network=False,

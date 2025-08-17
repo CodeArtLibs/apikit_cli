@@ -76,7 +76,7 @@ test_commands:
 # -------------------------------------------------------------------------------------------------
 # APIKit CLI Build
 
-build: clear format lint
+build: clear format lint test
 	# Slow startup
 	#env/bin/pyinstaller --hidden-import=rich --onefile apikit_cli/apikit.py --distpath ./dist
 	#env/bin/python -m nuitka --python-flag=no_asserts --python-flag=no_docstrings --python-flag=unbuffered --include-package=rich --standalone --onefile --show-progress --output-dir=./dist apikit_cli/apikit.py
