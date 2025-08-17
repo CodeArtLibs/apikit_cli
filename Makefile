@@ -38,11 +38,10 @@ lint: clear clean format
 	env/bin/mypy . --strict --exclude 'env/|tests|sample_app/'
 	# --ignore-missing-imports
 
-# -------------------------------------------------------------------------------------------------
-# APIKit CLI Build
-
 test: clear
 	time env/bin/pytest . -n auto --ignore sample_app
+
+test_commands:
 	#time env/bin/pytest . --failed-first --last-failed -n auto
 	# Env
 	env/bin/python apikit_cli/apikit.py --help
@@ -72,6 +71,10 @@ test: clear
 	env/bin/python apikit_cli/apikit.py admin
 	env/bin/python apikit_cli/apikit.py python
 	env/bin/python apikit_cli/apikit.py report_bug
+
+
+# -------------------------------------------------------------------------------------------------
+# APIKit CLI Build
 
 build: clear format lint
 	# Slow startup
