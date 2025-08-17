@@ -30,8 +30,9 @@ minikube-linux*
 *.csvb
 **/target/**
 apikit.spec
+apikit
 apikit_old
 apikit_new
-.db/
 apikit.ini
-apikit
+.db/
+TODO.md
