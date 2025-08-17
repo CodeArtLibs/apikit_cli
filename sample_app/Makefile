@@ -10,6 +10,7 @@ help:
 
 version:
 	@../env/bin/python ../apikit_cli/apikit.py version
+	@../env/bin/python ../apikit_cli/apikit.py version --simple
 	@echo '--------------------------------------'
 
 check:
@@ -18,6 +19,7 @@ check:
 
 upgrade:
 	@../env/bin/python ../apikit_cli/apikit.py upgrade
+	@../env/bin/python ../apikit_cli/apikit.py upgrade --reinstall
 	@echo '--------------------------------------'
 
 format:
@@ -34,6 +36,7 @@ compile:
 
 tests:
 	@../env/bin/python ../apikit_cli/apikit.py tests
+	@../env/bin/python ../apikit_cli/apikit.py tests --verbose
 	@echo '--------------------------------------'
 
 build:

@@ -53,6 +53,7 @@ test_commands:
 	env/bin/python apikit_cli/apikit.py lint
 	env/bin/python apikit_cli/apikit.py compile
 	env/bin/python apikit_cli/apikit.py tests
+	env/bin/python apikit_cli/apikit.py tests --verbose
 	env/bin/python apikit_cli/apikit.py build
 	env/bin/python apikit_cli/apikit.py rebuild
 	env/bin/python apikit_cli/apikit.py ci
@@ -87,13 +88,16 @@ test_bin: clear
 	# Env
 	apikit --help
 	apikit version
+	apikit version --simple
 	apikit check
 	apikit upgrade
+	apikit upgrade --reinstall
 	# CI
 	apikit format
 	apikit lint
 	apikit compile
 	apikit tests
+	apikit tests --verbose
 	apikit build
 	apikit rebuild
 	apikit ci
