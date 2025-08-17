@@ -426,12 +426,15 @@ class CheckCommandCLI(CommandCLI):
 class UpgradeCommandCLI(CommandCLI):
     def execute(self) -> None:
         try:
-            latest_version: str = self.latest_version()
-            if version_lower_than(latest_version, API_KIT_VERSION):
-                print(yellow(f'APIKit CLI is out to date. Current {API_KIT_VERSION}. Latest {latest_version}'))
+            if self.cli_args.get('reinstall'):
                 self.upgrade_apikit_cli()
             else:
-                print(f'APIKit CLI is up to date. Current {API_KIT_VERSION} - Latest {latest_version}')
+                latest_version: str = self.latest_version()
+                if version_lower_than(latest_version, API_KIT_VERSION):
+                    print(yellow(f'APIKit CLI is out to date. Current {API_KIT_VERSION}. Latest {latest_version}'))
+                    self.upgrade_apikit_cli()
+                else:
+                    print(f'APIKit CLI is up to date. Current {API_KIT_VERSION} - Latest {latest_version}')
         except Exception as e:
             print(red(str(e)))
             print(yellow('Update check failed.'))
@@ -735,6 +738,7 @@ if __name__ == '__main__':
     cli_parser = subparsers.add_parser('version')
     cli_parser = subparsers.add_parser('check')
     cli_parser = subparsers.add_parser('upgrade')
+    cli_parser.add_argument('--reinstall', action='store_true')
     # CI
     cli_parser = subparsers.add_parser('format')
     cli_parser = subparsers.add_parser('lint')
