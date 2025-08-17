@@ -1,4 +1,4 @@
-CLI_VERSION := 0.0
+CLI_VERSION := 0.1
 
 # -------------------------------------------------------------------------------------------------
 # CLI Development
@@ -129,7 +129,7 @@ copy:
 all: test build test_bin update copy
 
 # Update Makefile/CLI_VERSION and apikit.py/API_KIT_VERSION
-publish:
+release:
 	echo $(CLI_VERSION) > releases/latest.txt
 	git add releases/latest.txt apikit_cli/apikit.py Makefile
 	git commit -m "Release $(CLI_VERSION)"
