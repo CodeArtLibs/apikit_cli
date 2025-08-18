@@ -291,7 +291,7 @@ class CommandCLI:
         env = env or {}
         env['DEV_ENV'] = 'true'
         env['APP'] = CONFIG['app']
-        env['API_VERSION'] ='dev'
+        env['API_VERSION'] = 'dev'
         env_vars: str = ' '.join([arg for k, v in env.items() for arg in ('-e', f'{k}={v}')])
         network: str = '--network host' if host_network else '--add-host=host.docker.internal:host-gateway'
         detached_attr: str = '-d' if detached else ''
@@ -514,10 +514,13 @@ class TestsCommandCLI(CommandCLI):
         redis_url: str
         custom_apps_dir: str = os.getenv('APIKIT_APPS_DIR', '')
         verbose: str = (
-            '--no-header --tb=line' if self.cli_args.get('verbose', False) else '--no-header -q --disable-warnings --tb=no'
+            # auto, long, short, line, native, no.
+            '--no-header --disable-warnings --tb=short'
+            if self.cli_args.get('verbose', False)
+            else '--no-header -q --disable-warnings --tb=no'
         )
         with self.with_mongodb(mongodb_container_name) as mongodb_url, self.with_redis(redis_container_name) as redis_url:
-            pytest_cmd: str = f'/app/env/bin/pytest --asyncio-mode=auto /app/apps {custom_apps_dir} -n auto {verbose}'
+            pytest_cmd: str = f'/app/env/bin/pytest --asyncio-mode=auto /app/apps {custom_apps_dir} -n auto --color=yes {verbose}'
             self.docker_run(
                 pytest_cmd,
                 host_network=False,
@@ -552,7 +555,6 @@ class CICommandCLI(CommandCLIComposite):
 
 class InfoCommandCLI(CommandCLI):
     def execute(self) -> None:
-        app: str = CONFIG['app']
         self.docker_run(
             'env/bin/python -c "from api_web import main ; main.check()"',
             # APIKIT_LOG_PRINT_MIN_LEVEL='info' if self.cli_args.get('verbose') else 'success',
