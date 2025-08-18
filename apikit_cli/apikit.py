@@ -17,6 +17,7 @@ import socket
 import ssl
 import stat
 import subprocess
+import sys
 import tempfile
 import time
 import typing
@@ -707,6 +708,11 @@ class PythonCommandCLI(CommandCLI):
         self.docker_run('env/bin/python', interactive=True)
 
 
+class ShellCommandCLI(CommandCLI):
+    def execute(self) -> None:
+        self.docker_run('ash', interactive=True)
+
+
 class ReportBugCommandCLI(CommandCLI):
     def execute(self) -> None:
         # TODO: request
@@ -741,6 +747,7 @@ COMMANDS: dict[str, type[CommandCLI]] = {
     # Debug
     'admin': AdminCommandCLI,
     'python': PythonCommandCLI,
+    'shell': ShellCommandCLI,
     'report_bug': ReportBugCommandCLI,
 }
 
@@ -752,6 +759,19 @@ if __name__ == '__main__':
     apikit --help
     apikit start --port 33333
     """
+
+    cmd: CommandCLI
+    CommandCLIClass: type[CommandCLI]
+    # Hidden commands
+    hidden_commands: list[str] = ['shell']
+    if len(sys.argv) > 1 and sys.argv[1] in hidden_commands:
+        CommandCLIClass = COMMANDS[sys.argv[1]]
+        cmd = CommandCLIClass()  # no args for now
+        try:
+            cmd.execute()
+        except KeyboardInterrupt:
+            pass
+        sys.exit(0)
 
     parser: argparse.ArgumentParser = argparse.ArgumentParser()
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser] = parser.add_subparsers(dest='command', required=True)
@@ -793,8 +813,8 @@ if __name__ == '__main__':
 
     args: argparse.Namespace = parser.parse_args()
 
-    CommandCLIClass: type[CommandCLI] = COMMANDS[args.command]
-    cmd: CommandCLI = CommandCLIClass(**vars(args))
+    CommandCLIClass = COMMANDS[args.command]
+    cmd = CommandCLIClass(**vars(args))
     try:
         cmd.execute()
     except KeyboardInterrupt:

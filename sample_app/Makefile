@@ -1,7 +1,7 @@
 clear:
 	clear
 
-shell:
+docker_shell:
 	docker run -v ./apps:/app/apps --network host -it apikit-dev:latest ash
 
 help:
@@ -98,6 +98,10 @@ admin:
 
 python:
 	@../env/bin/python ../apikit_cli/apikit.py python
+	@echo '--------------------------------------'
+
+shell:
+	@../env/bin/python ../apikit_cli/apikit.py shell
 	@echo '--------------------------------------'
 
 report_bug:

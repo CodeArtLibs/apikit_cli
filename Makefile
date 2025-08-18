@@ -72,6 +72,7 @@ test_commands:
 	# Debug
 	env/bin/python apikit_cli/apikit.py admin
 	env/bin/python apikit_cli/apikit.py python
+	env/bin/python apikit_cli/apikit.py shell
 	env/bin/python apikit_cli/apikit.py report_bug
 
 
@@ -117,6 +118,7 @@ test_bin: clear
 	# Debug
 	apikit admin
 	apikit python
+	apikit shell
 	apikit report_bug
 
 
@@ -132,6 +134,9 @@ update: build
 copy:
 	# Just for debug
 	cp apikit ../apikit_template
+	cp apikit ../pyapi/api-kit
+	cp apikit ../pyapi/api-manager
+
 
 all: test build test_bin update copy
 
