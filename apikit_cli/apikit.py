@@ -266,6 +266,7 @@ class CommandCLI:
     def docker_run(
         self,
         container_cmd: str,
+        *,
         interactive: bool = False,
         capture_output: bool = False,
         detached: bool = False,
@@ -292,7 +293,7 @@ class CommandCLI:
         env = env or {}
         env['DEV_ENV'] = 'true'
         env['APP'] = CONFIG['app']
-        env['API_VERSION'] = 'dev'
+        env.setdefault('API_VERSION', 'dev')
         env_vars: str = ' '.join([arg for k, v in env.items() for arg in ('-e', f'{k}={v}')])
         network: str = '--network host' if host_network else '--add-host=host.docker.internal:host-gateway'
         detached_attr: str = '-d' if detached else ''
@@ -520,15 +521,25 @@ class TestsCommandCLI(CommandCLI):
             if self.cli_args.get('verbose', False)
             else '--no-header -q --disable-warnings --tb=no'
         )
+
+        env_vars: dict[str, str] = {}
+        for pair in self.cli_args.get('env', []):
+            k, v = str(pair).split('=', maxsplit=1)
+            env_vars[k] = v
         with self.with_mongodb(mongodb_container_name) as mongodb_url, self.with_redis(redis_container_name) as redis_url:
+            # asyncio_default_fixture_loop_scope = session
+            # asyncio_default_test_loop_scope = session
             pytest_cmd: str = f'/app/env/bin/pytest --asyncio-mode=auto /app/apps {custom_apps_dir} -n auto --color=yes {verbose}'
             self.docker_run(
                 pytest_cmd,
                 host_network=False,
+                API_VERSION='test',
                 TEST_ENV='true',
                 MONGODB_URI=mongodb_url,
                 MONGODB_NAME=f'{app}_unittest',
                 REDIS_URL=redis_url,
+                # Mypy bug
+                **env_vars,  # type: ignore[arg-type]
             )
 
 
@@ -789,6 +800,7 @@ if __name__ == '__main__':
     cli_parser = subparsers.add_parser('compile')
     cli_parser = subparsers.add_parser('tests')
     cli_parser.add_argument('--verbose', action='store_true')
+    cli_parser.add_argument('--env', nargs='*', default=[], help='Environment variables, like VAR=VALUE')
     cli_parser = subparsers.add_parser('build')
     cli_parser = subparsers.add_parser('rebuild')
     cli_parser = subparsers.add_parser('ci')

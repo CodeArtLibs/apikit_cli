@@ -35,8 +35,8 @@ compile:
 	@echo '--------------------------------------'
 
 tests:
-	@../env/bin/python ../apikit_cli/apikit.py tests
-	@../env/bin/python ../apikit_cli/apikit.py tests --verbose
+	@../env/bin/python ../apikit_cli/apikit.py tests --env SOME_ENV_VAR=abc ANOTHER_ENV_VAR=def
+	@../env/bin/python ../apikit_cli/apikit.py tests --verbose --env SOME_ENV_VAR=abc ANOTHER_ENV_VAR=def
 	@echo '--------------------------------------'
 
 build:
