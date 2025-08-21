@@ -25,7 +25,7 @@ import typing
 import urllib.request
 from contextlib import contextmanager
 
-API_KIT_VERSION = __version__ = '0.4'
+API_KIT_VERSION = __version__ = '0.5'
 DEBUG: bool = False
 
 
@@ -129,7 +129,7 @@ def validate_dockerfile(path: str) -> None:
         sys.exit(1)
         # raise APIKitCLIException(f'Dockerfile must have exactly 1 FROM, found {len(from_matches)}')
 
-    if ('ARG APIKIT_IMAGE\n' not in content):
+    if ('ARG APIKIT_IMAGE' not in content):
         print(red('Invalid Dockerfile. Missing: ') + 'ARG APIKIT_IMAGE' + '\n')
         sys.exit(1)
         # raise APIKitCLIException('Dockerfile base image must use the APIKIT_IMAGE variable: FROM ${APIKIT_IMAGE}')
@@ -168,7 +168,7 @@ def get_app_config() -> dict[str, typing.Any]:
     config.setdefault('api_url', f'http://localhost:{config["port"]}')
     config.setdefault('admin_url', f'http://localhost:9001/auth/signin?api={config["api_url"]}')
     config.setdefault('autoupdate', '1')
-    config.setdefault('apikit_image', 'apikit-dev:latest')
+    config.setdefault('apikit_image', 'paulocheque/apikit-dev:latest')
     if DEBUG:
         print(white(str(config)))
     return config
