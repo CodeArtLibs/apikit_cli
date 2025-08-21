@@ -11,6 +11,7 @@ import os
 import platform
 import random
 import secrets
+import re
 import shlex
 import shutil
 import socket
@@ -117,6 +118,27 @@ def version_lower_than(v1: str, v2: str) -> bool:
     return parts1 < parts2
 
 
+def validate_dockerfile(path: str) -> None:
+    with open(path, 'r') as f:
+        content = f.read()
+
+    # Count FROM commands
+    from_matches: list[str] = re.findall(r'^\s*FROM\b', content, flags=re.MULTILINE)
+    if len(from_matches) != 1:
+        print(red('Invalid Dockerfile. Multiple FROM expressions: ') + str(from_matches) + '\n')
+        sys.exit(1)
+        # raise APIKitCLIException(f'Dockerfile must have exactly 1 FROM, found {len(from_matches)}')
+
+    if ('ARG APIKIT_IMAGE\n' not in content):
+        print(red('Invalid Dockerfile. Missing: ') + 'ARG APIKIT_IMAGE' + '\n')
+        sys.exit(1)
+        # raise APIKitCLIException('Dockerfile base image must use the APIKIT_IMAGE variable: FROM ${APIKIT_IMAGE}')
+    if ('FROM ${APIKIT_IMAGE}\n' not in content):
+        print(red('Invalid Dockerfile. Missing: ') + 'FROM ${APIKIT_IMAGE}' + '\n')
+        sys.exit(1)
+        # raise APIKitCLIException('Dockerfile base image must use the APIKIT_IMAGE variable: FROM ${APIKIT_IMAGE}')
+
+
 def get_app_config() -> dict[str, typing.Any]:
     """
     apikit.ini
@@ -146,6 +168,7 @@ def get_app_config() -> dict[str, typing.Any]:
     config.setdefault('api_url', f'http://localhost:{config["port"]}')
     config.setdefault('admin_url', f'http://localhost:9001/auth/signin?api={config["api_url"]}')
     config.setdefault('autoupdate', '1')
+    config.setdefault('apikit_image', 'apikit-dev:latest')
     if DEBUG:
         print(white(str(config)))
     return config
@@ -282,9 +305,11 @@ class CommandCLI:
             if self.cli_args.get('auto_build', True):
                 if os.path.isfile('Dockerfile'):
                     print(yellow(f'Building Docker image {docker_image}'))
-                    self.execute_shell_command(f'docker build -f Dockerfile . -t {docker_image}')
+                    apikit_image: str = CONFIG['apikit_image']
+                    validate_dockerfile('Dockerfile')
+                    self.execute_shell_command(f'docker build --build-arg APIKIT_IMAGE={apikit_image} -f Dockerfile . -t {docker_image}')
                     # Rebuild
-                    # self.execute_shell_command(f'docker build --no-cache -f Dockerfile . -t {docker_image}')
+                    # self.execute_shell_command(f'docker build --build-arg APIKIT_IMAGE={apikit_image} --no-cache -f Dockerfile . -t {docker_image}')
                 else:
                     print(red(f'Missing Dockerfile to compile {docker_image}'))
 
@@ -547,7 +572,9 @@ class BuildCommandCLI(CommandCLI):
     def execute(self) -> None:
         docker_image: str = CONFIG['docker_image']
         if os.path.isfile('Dockerfile'):
-            self.execute_shell_command(f'docker build -f Dockerfile . -t {docker_image}')
+            apikit_image: str = CONFIG['apikit_image']
+            validate_dockerfile('Dockerfile')
+            self.execute_shell_command(f'docker build --build-arg APIKIT_IMAGE={apikit_image} -f Dockerfile . -t {docker_image}')
         else:
             print(red(f'Missing Dockerfile to compile {docker_image}'))
 
@@ -556,7 +583,9 @@ class RebuildCommandCLI(CommandCLI):
     def execute(self) -> None:
         docker_image: str = CONFIG['docker_image']
         if os.path.isfile('Dockerfile'):
-            self.execute_shell_command(f'docker build --no-cache -f Dockerfile . -t {docker_image}')
+            apikit_image: str = CONFIG['apikit_image']
+            validate_dockerfile('Dockerfile')
+            self.execute_shell_command(f'docker build --build-arg APIKIT_IMAGE={apikit_image} --no-cache -f Dockerfile . -t {docker_image}')
         else:
             print(red(f'Missing Dockerfile to re-compile {docker_image}'))
 

@@ -1,4 +1,5 @@
-FROM apikit-dev:latest
+ARG APIKIT_IMAGE
+FROM ${APIKIT_IMAGE}
 
 # For APIKit CLI testing
 
